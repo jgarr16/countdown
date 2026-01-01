@@ -17,6 +17,7 @@ type Task = {
   id: string;
   text: string;
   completed: boolean;
+  dueDate?: Date;
 };
 
 // Hook for localStorage persistence
@@ -54,6 +55,7 @@ export default function Home() {
   // -- Session State (Tasks) --
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
 
   // -- Computed Values --
   const today = startOfToday();
@@ -117,8 +119,14 @@ export default function Home() {
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskText.trim()) return;
-    setTasks([...tasks, { id: crypto.randomUUID(), text: newTaskText, completed: false }]);
+    setTasks([...tasks, { 
+      id: crypto.randomUUID(), 
+      text: newTaskText, 
+      completed: false,
+      dueDate: newTaskDate
+    }]);
     setNewTaskText("");
+    setNewTaskDate(undefined);
   };
 
   const toggleTask = (id: string) => {
@@ -288,6 +296,13 @@ export default function Home() {
                               )}>
                                 {task.text}
                               </p>
+                              {task.dueDate && (
+                                <p className="text-[10px] mt-1 font-medium text-primary flex items-center gap-1">
+                                  <CalendarIcon className="h-2.5 w-2.5" />
+                                  Due: {format(task.dueDate, "MMM d")} 
+                                  ({differenceInCalendarDays(task.dueDate, today)} days left)
+                                </p>
+                              )}
                             </div>
                             <button 
                               onClick={() => deleteTask(task.id)}
@@ -301,18 +316,40 @@ export default function Home() {
                    )}
                  </ScrollArea>
                  
-                 <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm">
-                   <form onSubmit={addTask} className="flex gap-2">
+                 <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm space-y-3">
+                   <div className="flex gap-2">
                      <Input 
                        placeholder="Add a new task..." 
                        value={newTaskText}
                        onChange={(e) => setNewTaskText(e.target.value)}
                        className="flex-1"
                      />
-                     <Button type="submit" size="icon" disabled={!newTaskText.trim()}>
+                     <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="icon" className={cn(!newTaskDate && "text-muted-foreground")}>
+                            <CalendarIcon className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                          <Calendar
+                            mode="single"
+                            selected={newTaskDate}
+                            onSelect={setNewTaskDate}
+                            disabled={(date) => date < today}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                     </Popover>
+                     <Button type="submit" size="icon" disabled={!newTaskText.trim()} onClick={addTask}>
                        <Plus className="h-4 w-4" />
                      </Button>
-                   </form>
+                   </div>
+                   {newTaskDate && (
+                     <p className="text-[10px] font-medium text-primary flex items-center gap-1 animate-in slide-in-from-top-1">
+                       <CalendarIcon className="h-2.5 w-2.5" />
+                       Due date set for {format(newTaskDate, "MMM d")}
+                     </p>
+                   )}
                  </div>
               </CardContent>
             </Card>
