@@ -139,7 +139,7 @@ export default function Home() {
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-primary">DayCount</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">Workday Tracker</h1>
             <p className="text-muted-foreground mt-1">Manage your time, track your days.</p>
           </div>
           <div className="flex items-center gap-2">
