@@ -282,7 +282,14 @@ export default function Home() {
                      </div>
                    ) : (
                      <ul className="space-y-3">
-                       {tasks.map(task => (
+                       {tasks
+                         .sort((a, b) => {
+                           if (!a.dueDate && !b.dueDate) return 0;
+                           if (!a.dueDate) return 1;
+                           if (!b.dueDate) return -1;
+                           return a.dueDate.getTime() - b.dueDate.getTime();
+                         })
+                         .map(task => (
                          <li key={task.id} className="group flex items-start gap-3 bg-card p-3 rounded-lg border border-transparent hover:border-border/50 transition-all">
                             <Checkbox 
                               checked={task.completed} 
