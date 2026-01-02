@@ -20,12 +20,26 @@ type Task = {
   dueDate?: Date;
 };
 
+type ExcludedDate = {
+  date: string; // ISO string
+  comment?: string;
+};
+
 // Hook for localStorage persistence
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      if (!item) return initialValue;
+      
+      // Migration for excluded dates (from string[] to ExcludedDate[])
+      if (key === "daycount-excluded") {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
+          return parsed.map((d: string) => ({ date: d })) as unknown as T;
+        }
+      }
+      return JSON.parse(item);
     } catch (error) {
       console.error(error);
       return initialValue;
@@ -49,7 +63,7 @@ export default function Home() {
   
   // -- Persistent State --
   const [targetDate, setTargetDate] = useLocalStorage<Date | undefined>("daycount-target", undefined);
-  const [excludedDates, setExcludedDates] = useLocalStorage<string[]>("daycount-excluded", []);
+  const [excludedDates, setExcludedDates] = useLocalStorage<ExcludedDate[]>("daycount-excluded", []);
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
 
   // -- UI State --
@@ -70,10 +84,11 @@ export default function Home() {
     if (!safeTargetDate || calendarDaysRemaining < 0) return 0;
     let workingDays = 0;
     const daysDiff = differenceInCalendarDays(safeTargetDate, today);
+    const excludedISOStrings = excludedDates.map(d => d.date);
     for (let i = 0; i <= daysDiff; i++) {
       const dayToCheck = addDays(today, i);
       const isWeekend = isSaturday(dayToCheck) || isSunday(dayToCheck);
-      const isExcluded = excludedDates.includes(dayToCheck.toISOString());
+      const isExcluded = excludedISOStrings.includes(dayToCheck.toISOString());
       if (!isWeekend && !isExcluded) workingDays++;
     }
     return workingDays;
@@ -84,11 +99,15 @@ export default function Home() {
   // -- Handlers --
   const toggleExclusion = (date: Date) => {
     const isoDate = date.toISOString();
-    if (excludedDates.includes(isoDate)) {
-      setExcludedDates(excludedDates.filter(d => d !== isoDate));
+    if (excludedDates.some(d => d.date === isoDate)) {
+      setExcludedDates(excludedDates.filter(d => d.date !== isoDate));
     } else {
-      setExcludedDates([...excludedDates, isoDate]);
+      setExcludedDates([...excludedDates, { date: isoDate }]);
     }
+  };
+
+  const updateExclusionComment = (isoDate: string, comment: string) => {
+    setExcludedDates(excludedDates.map(d => d.date === isoDate ? { ...d, comment } : d));
   };
 
   const resetAll = () => {
@@ -121,7 +140,10 @@ export default function Home() {
     setTasks(tasks.filter(t => t.id !== id));
   };
 
-  const excludedDatesObj = excludedDates.map(d => new Date(d));
+  const excludedDatesObj = excludedDates.map(d => new Date(d.date));
+  const taskDates = tasks
+    .filter(t => t.dueDate && !t.completed)
+    .map(t => new Date(t.dueDate!));
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans text-foreground">
@@ -205,10 +227,15 @@ export default function Home() {
                       className="w-full h-auto"
                       disabled={(date) => date < today}
                       modifiers={{
-                        weekend: (date) => isSaturday(date) || isSunday(date)
+                        weekend: (date) => isSaturday(date) || isSunday(date),
+                        tasked: taskDates
                       }}
                       modifiersStyles={{
-                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
+                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 },
+                        tasked: { 
+                          borderBottom: "2px solid var(--primary)",
+                          borderRadius: "0px"
+                        }
                       }}
                       showOutsideDays={false}
                     />
@@ -236,13 +263,21 @@ export default function Home() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <CardContent className="pb-6">
-                      <div className="flex flex-col gap-2">
-                        {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
-                          <div key={date.toISOString()} className="flex items-center justify-between bg-secondary/50 text-secondary-foreground px-4 py-3 rounded-xl border border-border/50 transition-all hover:bg-secondary/80">
-                            <span className="font-semibold text-base">{format(date, "MMM d, yyyy")}</span>
-                            <button onClick={() => toggleExclusion(date)} className="p-2 -mr-1 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10">
-                              <Trash2 className="h-5 w-5" />
-                            </button>
+                      <div className="flex flex-col gap-4">
+                        {[...excludedDates].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((item) => (
+                          <div key={item.date} className="space-y-2 bg-secondary/30 p-4 rounded-xl border border-border/50">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-base">{format(new Date(item.date), "MMM d, yyyy")}</span>
+                              <button onClick={() => toggleExclusion(new Date(item.date))} className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10">
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </div>
+                            <Input 
+                              placeholder="Add a comment (e.g. Bank Holiday, Vacation)" 
+                              value={item.comment || ""} 
+                              onChange={(e) => updateExclusionComment(item.date, e.target.value)}
+                              className="bg-background/50 h-8 text-sm"
+                            />
                           </div>
                         ))}
                       </div>
