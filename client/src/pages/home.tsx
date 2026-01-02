@@ -214,7 +214,7 @@ export default function Home() {
             </div>
 
             {/* Calendar Section */}
-            <Card className="shadow-sm border-border/60">
+            <Card className="shadow-sm border-border/60 overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg">Calendar</CardTitle>
                 <CardDescription>
@@ -222,14 +222,14 @@ export default function Home() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-8">
-                <div className="flex justify-center w-full">
+                <div className="flex justify-center w-full overflow-hidden">
                   <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
-                    <div className="[&_.rdp]:!m-0 [&_.rdp-months]:!justify-center [&_.rdp-month]:!w-full [&_.rdp-table]:!w-full [&_.rdp-cell]:!p-0 [&_.rdp-button]:!h-10 [&_.rdp-button]:!w-full [&_.rdp-head_cell]:!font-bold">
+                    <div className="[&_.rdp]:!m-0 [&_.rdp-months]:!justify-center [&_.rdp-month]:!w-full [&_.rdp-table]:!w-full [&_.rdp-cell]:!p-0 [&_.rdp-button]:!h-10 [&_.rdp-button]:!w-full [&_.rdp-head_cell]:!font-bold [&_.rdp-day]:!h-10 [&_.rdp-day]:!w-full [&_.rdp-tbody]:!h-auto [&_.rdp-table]:!table-fixed [&_.rdp-table]:!border-collapse [&_.rdp-month]:!space-y-0">
                       <Calendar
                         mode="multiple"
                         selected={excludedDatesObj}
                         onSelect={(_, date) => toggleExclusion(date)}
-                        className="w-full"
+                        className="w-full h-auto"
                         disabled={(date) => date < today}
                         modifiers={{
                           weekend: (date) => isSaturday(date) || isSunday(date)
