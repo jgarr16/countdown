@@ -148,8 +148,7 @@ export default function Home() {
         {/* Header */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-primary">Workday Tracker</h1>
-            <p className="text-muted-foreground mt-1">Manage your time, track your days.</p>
+            <h1 className="text-4xl font-extrabold tracking-tighter text-primary">Countdown!</h1>
           </div>
           <div className="flex items-center gap-2">
             <Popover>
@@ -217,30 +216,29 @@ export default function Home() {
             </div>
 
             {/* Calendar & Exclusions */}
-            <Card className="shadow-sm border-border/60 overflow-hidden">
+            <Card className="shadow-sm border-border/60">
               <CardHeader>
                 <CardTitle className="text-lg">Calendar & Exclusions</CardTitle>
                 <CardDescription>
-                  Select dates below to mark them as non-working days (holidays, leave).
+                  Select dates below to mark them as non-working days.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="px-2 sm:px-6 pb-6">
-                <div className="flex justify-center overflow-x-auto">
-                  <div className="min-w-fit">
-                    <Calendar
-                      mode="multiple"
-                      selected={excludedDatesObj}
-                      onSelect={(_, date) => toggleExclusion(date)}
-                      className="rounded-md border p-3 w-full"
-                      disabled={(date) => date < today}
-                      modifiers={{
-                        weekend: (date) => isSaturday(date) || isSunday(date)
-                      }}
-                      modifiersStyles={{
-                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
-                      }}
-                    />
-                  </div>
+              <CardContent className="pb-6">
+                <div className="flex justify-center">
+                  <Calendar
+                    mode="multiple"
+                    selected={excludedDatesObj}
+                    onSelect={(_, date) => toggleExclusion(date)}
+                    className="rounded-md border p-3 w-full max-w-full sm:max-w-md pointer-events-auto"
+                    disabled={(date) => date < today}
+                    modifiers={{
+                      weekend: (date) => isSaturday(date) || isSunday(date)
+                    }}
+                    modifiersStyles={{
+                      weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
+                    }}
+                    showOutsideDays={false}
+                  />
                 </div>
                 
                 {excludedDates.length > 0 && (
