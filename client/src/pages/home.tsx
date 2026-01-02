@@ -189,43 +189,41 @@ export default function Home() {
             {/* Countdown Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <Card className="bg-card shadow-sm border-border/60">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 text-center">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calendar Days</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold tracking-tight">
+                <CardContent className="text-center pb-6">
+                  <div className="text-5xl font-bold tracking-tighter">
                     {safeTargetDate ? Math.max(0, calendarDaysRemaining) : "—"}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Total days remaining</p>
                 </CardContent>
               </Card>
 
               <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-primary uppercase tracking-wider flex items-center gap-2">
+                <CardHeader className="pb-2 text-center">
+                  <CardTitle className="text-sm font-medium text-primary uppercase tracking-wider flex items-center justify-center gap-2">
                     <Briefcase className="h-4 w-4" /> Working Days
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-primary tracking-tight">
+                <CardContent className="text-center pb-6">
+                  <div className="text-5xl font-bold text-primary tracking-tighter">
                     {safeTargetDate ? Math.max(0, workingDaysRemaining) : "—"}
                   </div>
-                  <p className="text-xs text-primary/70 mt-1">Excluding weekends & holidays</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Calendar & Exclusions */}
+            {/* Calendar Section */}
             <Card className="shadow-sm border-border/60">
               <CardHeader>
-                <CardTitle className="text-lg">Calendar & Exclusions</CardTitle>
+                <CardTitle className="text-lg">Calendar</CardTitle>
                 <CardDescription>
-                  Select dates below to mark them as non-working days.
+                  Select dates to mark them as non-working days.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pb-6 flex flex-col gap-6">
+              <CardContent className="pb-8">
                 <div className="flex justify-center w-full">
-                  <div className="w-full max-w-sm border rounded-lg p-2 bg-card relative z-10">
+                  <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
                     <Calendar
                       mode="multiple"
                       selected={excludedDatesObj}
@@ -242,25 +240,30 @@ export default function Home() {
                     />
                   </div>
                 </div>
-                
-                {excludedDates.length > 0 && (
-                  <div className="pt-6 border-t-2 border-border/60 relative z-0">
-                    <h4 className="text-sm font-medium mb-4 text-muted-foreground">Excluded Dates</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
-                        <div key={date.toISOString()} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full text-xs font-medium animate-in zoom-in-50 duration-200">
-                          {format(date, "MMM d")}
-                          <button onClick={() => toggleExclusion(date)} className="ml-1 hover:text-destructive">
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
+            {/* Separate Exclusions Section */}
+            {excludedDates.length > 0 && (
+              <Card className="shadow-sm border-border/60 animate-in fade-in slide-in-from-bottom-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Excluded Dates</CardTitle>
+                  <CardDescription>Management list of your non-working days.</CardDescription>
+                </CardHeader>
+                <CardContent className="pb-6">
+                  <div className="flex flex-wrap gap-2">
+                    {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
+                      <div key={date.toISOString()} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:bg-secondary/80">
+                        {format(date, "MMM d, yyyy")}
+                        <button onClick={() => toggleExclusion(date)} className="ml-2 text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column: Tasks (Span 5) */}
