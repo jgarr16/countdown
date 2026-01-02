@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, isSameDay, startOfToday } from "date-fns";
+import { useState } from "react";
+import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, startOfToday } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +54,7 @@ export default function Home() {
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
 
   // -- UI State --
+  const [isExclusionsOpen, setIsExclusionsOpen] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
 
@@ -215,11 +216,8 @@ export default function Home() {
 
             {/* Calendar Section */}
             <Card className="shadow-sm border-border/60 overflow-hidden">
-              <CardHeader>
+              <CardHeader className="text-center">
                 <CardTitle className="text-lg">Calendar</CardTitle>
-                <CardDescription>
-                  Select dates to mark them as non-working days.
-                </CardDescription>
               </CardHeader>
               <CardContent className="pb-8">
                 <div className="flex justify-center w-full overflow-hidden">
@@ -247,41 +245,52 @@ export default function Home() {
 
             {/* Separate Exclusions Section */}
             {excludedDates.length > 0 && (
-              <Card className="shadow-sm border-border/60 animate-in fade-in slide-in-from-bottom-2">
-                <CardHeader>
-                  <CardTitle className="text-lg">Excluded Dates</CardTitle>
-                  <CardDescription>Management list of your non-working days.</CardDescription>
-                </CardHeader>
-                <CardContent className="pb-6">
-                  <div className="flex flex-col gap-2">
-                    {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
-                      <div key={date.toISOString()} className="flex items-center justify-between bg-secondary/50 text-secondary-foreground px-4 py-3 rounded-xl border border-border/50 transition-all hover:bg-secondary/80">
-                        <span className="font-semibold text-base">{format(date, "MMM d, yyyy")}</span>
-                        <button 
-                          onClick={() => toggleExclusion(date)} 
-                          className="p-2 -mr-1 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+              <Collapsible
+                open={isExclusionsOpen}
+                onOpenChange={setIsExclusionsOpen}
+                className="w-full"
+              >
+                <Card className="shadow-sm border-border/60 animate-in fade-in slide-in-from-bottom-2">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-center relative">
+                        <CardTitle className="text-lg">Excluded Dates</CardTitle>
+                        <div className="absolute right-0">
+                          {isExclusionsOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pb-6">
+                      <div className="flex flex-col gap-2">
+                        {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
+                          <div key={date.toISOString()} className="flex items-center justify-between bg-secondary/50 text-secondary-foreground px-4 py-3 rounded-xl border border-border/50 transition-all hover:bg-secondary/80">
+                            <span className="font-semibold text-base">{format(date, "MMM d, yyyy")}</span>
+                            <button 
+                              onClick={() => toggleExclusion(date)} 
+                              className="p-2 -mr-1 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             )}
           </div>
 
           {/* Right Column: Tasks (Span 5) */}
           <div className="w-full md:col-span-5 md:sticky md:top-8">
             <Card className="shadow-sm border-border/60 flex flex-col min-h-[500px]">
-              <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="pb-4 border-b border-border/40 bg-muted/20 text-center">
+                <CardTitle className="flex items-center justify-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" /> 
                   Session Tasks
                 </CardTitle>
-                <CardDescription>
-                  Quick checklist for your current session.
-                </CardDescription>
               </CardHeader>
               
               <CardContent className="flex-1 p-0 flex flex-col min-h-[300px]">
