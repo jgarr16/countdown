@@ -224,20 +224,22 @@ export default function Home() {
               <CardContent className="pb-8">
                 <div className="flex justify-center w-full">
                   <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
-                    <Calendar
-                      mode="multiple"
-                      selected={excludedDatesObj}
-                      onSelect={(_, date) => toggleExclusion(date)}
-                      className="w-full"
-                      disabled={(date) => date < today}
-                      modifiers={{
-                        weekend: (date) => isSaturday(date) || isSunday(date)
-                      }}
-                      modifiersStyles={{
-                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
-                      }}
-                      showOutsideDays={false}
-                    />
+                    <div className="[&_.rdp]:!m-0 [&_.rdp-months]:!justify-center [&_.rdp-month]:!w-full [&_.rdp-table]:!w-full [&_.rdp-cell]:!p-0 [&_.rdp-button]:!h-10 [&_.rdp-button]:!w-full [&_.rdp-head_cell]:!font-bold">
+                      <Calendar
+                        mode="multiple"
+                        selected={excludedDatesObj}
+                        onSelect={(_, date) => toggleExclusion(date)}
+                        className="w-full"
+                        disabled={(date) => date < today}
+                        modifiers={{
+                          weekend: (date) => isSaturday(date) || isSunday(date)
+                        }}
+                        modifiersStyles={{
+                          weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
+                        }}
+                        showOutsideDays={false}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -251,12 +253,15 @@ export default function Home() {
                   <CardDescription>Management list of your non-working days.</CardDescription>
                 </CardHeader>
                 <CardContent className="pb-6">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-col gap-2">
                     {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
-                      <div key={date.toISOString()} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:bg-secondary/80">
-                        {format(date, "MMM d, yyyy")}
-                        <button onClick={() => toggleExclusion(date)} className="ml-2 text-muted-foreground hover:text-destructive transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
+                      <div key={date.toISOString()} className="flex items-center justify-between bg-secondary/50 text-secondary-foreground px-4 py-3 rounded-xl border border-border/50 transition-all hover:bg-secondary/80">
+                        <span className="font-semibold text-base">{format(date, "MMM d, yyyy")}</span>
+                        <button 
+                          onClick={() => toggleExclusion(date)} 
+                          className="p-2 -mr-1 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-5 w-5" />
                         </button>
                       </div>
                     ))}
