@@ -51,9 +51,9 @@ export default function Home() {
   const [targetDate, setTargetDate] = useLocalStorage<Date | undefined>("daycount-target", undefined);
   // Store excluded dates as ISO strings
   const [excludedDates, setExcludedDates] = useLocalStorage<string[]>("daycount-excluded", []);
+  const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
 
-  // -- Session State (Tasks) --
-  const [tasks, setTasks] = useState<Task[]>([]);
+  // -- UI State --
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
 
@@ -109,10 +109,11 @@ export default function Home() {
   };
 
   const resetAll = () => {
-    if (confirm("Are you sure you want to reset the target date and all holidays?")) {
+    if (confirm("Are you sure you want to reset all data, including the target date, holidays, and tasks?")) {
       setTargetDate(undefined);
       setExcludedDates([]);
-      toast({ title: "Reset complete", description: "All settings have been cleared." });
+      setTasks([]);
+      toast({ title: "Reset complete", description: "All settings and tasks have been cleared." });
     }
   };
 
