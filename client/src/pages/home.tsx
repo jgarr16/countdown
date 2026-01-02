@@ -182,13 +182,13 @@ export default function Home() {
         </header>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
           {/* Left Column: Stats & Setup (Span 7) */}
-          <div className="md:col-span-7 space-y-6">
+          <div className="md:col-span-7 space-y-6 min-w-0">
             
             {/* Countdown Cards */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Card className="bg-card shadow-sm border-border/60">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calendar Days</CardTitle>
@@ -217,28 +217,30 @@ export default function Home() {
             </div>
 
             {/* Calendar & Exclusions */}
-            <Card className="shadow-sm border-border/60">
+            <Card className="shadow-sm border-border/60 overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg">Calendar & Exclusions</CardTitle>
                 <CardDescription>
                   Select dates below to mark them as non-working days (holidays, leave).
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="multiple"
-                    selected={excludedDatesObj}
-                    onSelect={(_, date) => toggleExclusion(date)}
-                    className="rounded-md border p-4 w-full max-w-sm"
-                    disabled={(date) => date < today} // Can't exclude past days (doesn't matter for future count)
-                    modifiers={{
-                      weekend: (date) => isSaturday(date) || isSunday(date)
-                    }}
-                    modifiersStyles={{
-                      weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
-                    }}
-                  />
+              <CardContent className="px-2 sm:px-6 pb-6">
+                <div className="flex justify-center overflow-x-auto">
+                  <div className="min-w-fit">
+                    <Calendar
+                      mode="multiple"
+                      selected={excludedDatesObj}
+                      onSelect={(_, date) => toggleExclusion(date)}
+                      className="rounded-md border p-3 w-full"
+                      disabled={(date) => date < today}
+                      modifiers={{
+                        weekend: (date) => isSaturday(date) || isSunday(date)
+                      }}
+                      modifiersStyles={{
+                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
+                      }}
+                    />
+                  </div>
                 </div>
                 
                 {excludedDates.length > 0 && (
