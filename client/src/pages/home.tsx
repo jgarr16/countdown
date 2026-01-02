@@ -225,7 +225,7 @@ export default function Home() {
               </CardHeader>
               <CardContent className="pb-6 flex flex-col gap-6">
                 <div className="flex justify-center w-full">
-                  <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
+                  <div className="w-full max-w-sm border rounded-lg p-2 bg-card relative z-10">
                     <Calendar
                       mode="multiple"
                       selected={excludedDatesObj}
@@ -244,8 +244,8 @@ export default function Home() {
                 </div>
                 
                 {excludedDates.length > 0 && (
-                  <div className="pt-4 border-t border-border/40">
-                    <h4 className="text-sm font-medium mb-3 text-muted-foreground">Excluded Dates</h4>
+                  <div className="pt-6 border-t-2 border-border/60 relative z-0">
+                    <h4 className="text-sm font-medium mb-4 text-muted-foreground">Excluded Dates</h4>
                     <div className="flex flex-wrap gap-2">
                       {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
                         <div key={date.toISOString()} className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full text-xs font-medium animate-in zoom-in-50 duration-200">
