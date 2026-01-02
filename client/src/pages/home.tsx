@@ -55,6 +55,7 @@ export default function Home() {
 
   // -- UI State --
   const [isExclusionsOpen, setIsExclusionsOpen] = useState(false);
+  const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
 
@@ -285,101 +286,116 @@ export default function Home() {
 
           {/* Right Column: Tasks (Span 5) */}
           <div className="w-full md:col-span-5 md:sticky md:top-8">
-            <Card className="shadow-sm border-border/60 flex flex-col min-h-[500px]">
-              <CardHeader className="pb-4 border-b border-border/40 bg-muted/20 text-center">
-                <CardTitle className="flex items-center justify-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-primary" /> 
-                  Tasks
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent className="flex-1 p-0 flex flex-col min-h-[300px]">
-                 <ScrollArea className="flex-1 p-4">
-                   {tasks.length === 0 ? (
-                     <div className="h-40 flex flex-col items-center justify-center text-muted-foreground/50 text-center px-4">
-                       <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
-                       <p className="text-sm">No tasks yet. Add one below!</p>
-                     </div>
-                   ) : (
-                     <ul className="space-y-3">
-                       {tasks
-                         .sort((a, b) => {
-                           if (!a.dueDate && !b.dueDate) return 0;
-                           if (!a.dueDate) return 1;
-                           if (!b.dueDate) return -1;
-                           return a.dueDate.getTime() - b.dueDate.getTime();
-                         })
-                         .map(task => (
-                         <li key={task.id} className="group flex items-start gap-3 bg-card p-3 rounded-lg border border-transparent hover:border-border/50 transition-all">
-                            <Checkbox 
-                              checked={task.completed} 
-                              onCheckedChange={() => toggleTask(task.id)} 
-                              className="mt-1"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className={cn(
-                                "text-sm leading-tight break-words transition-all",
-                                task.completed && "text-muted-foreground line-through decoration-muted-foreground/50"
-                              )}>
-                                {task.text}
-                              </p>
-                              {task.dueDate && (
-                                <p className="text-[10px] mt-1 font-medium text-primary flex items-center gap-1">
-                                  <CalendarIcon className="h-2.5 w-2.5" />
-                                  Due: {format(task.dueDate, "MMM d")} 
-                                  ({differenceInCalendarDays(task.dueDate, today)} days left)
-                                </p>
-                              )}
-                            </div>
-                            <button 
-                              onClick={() => deleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                         </li>
-                       ))}
-                     </ul>
-                   )}
-                 </ScrollArea>
-                 
-                 <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm space-y-3">
-                   <div className="flex gap-2">
-                     <Input 
-                       placeholder="Add a new task..." 
-                       value={newTaskText}
-                       onChange={(e) => setNewTaskText(e.target.value)}
-                       className="flex-1"
-                     />
-                     <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="icon" className={cn(!newTaskDate && "text-muted-foreground")}>
-                            <CalendarIcon className="h-4 w-4" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar
-                            mode="single"
-                            selected={newTaskDate}
-                            onSelect={setNewTaskDate}
-                            disabled={(date) => date < today}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                     </Popover>
-                     <Button type="submit" size="icon" disabled={!newTaskText.trim()} onClick={addTask}>
-                       <Plus className="h-4 w-4" />
-                     </Button>
-                   </div>
-                   {newTaskDate && (
-                     <p className="text-[10px] font-medium text-primary flex items-center gap-1 animate-in slide-in-from-top-1">
-                       <CalendarIcon className="h-2.5 w-2.5" />
-                       Due date set for {format(newTaskDate, "MMM d")}
-                     </p>
-                   )}
-                 </div>
-              </CardContent>
-            </Card>
+            <Collapsible
+              open={isTasksOpen}
+              onOpenChange={setIsTasksOpen}
+              className="w-full"
+            >
+              <Card className="shadow-sm border-border/60 flex flex-col min-h-[auto]">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-4 border-b border-border/40 bg-muted/20 text-center cursor-pointer hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center justify-center relative">
+                      <CardTitle className="flex items-center justify-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-primary" /> 
+                        Tasks
+                      </CardTitle>
+                      <div className="absolute right-0">
+                        {isTasksOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                
+                <CollapsibleContent>
+                  <CardContent className="flex-1 p-0 flex flex-col min-h-[300px]">
+                    <ScrollArea className="flex-1 p-4 h-[400px]">
+                      {tasks.length === 0 ? (
+                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground/50 text-center px-4">
+                          <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
+                          <p className="text-sm">No tasks yet. Add one below!</p>
+                        </div>
+                      ) : (
+                        <ul className="space-y-3">
+                          {tasks
+                            .sort((a, b) => {
+                              if (!a.dueDate && !b.dueDate) return 0;
+                              if (!a.dueDate) return 1;
+                              if (!b.dueDate) return -1;
+                              return a.dueDate.getTime() - b.dueDate.getTime();
+                            })
+                            .map(task => (
+                            <li key={task.id} className="group flex items-start gap-3 bg-card p-3 rounded-lg border border-transparent hover:border-border/50 transition-all">
+                                <Checkbox 
+                                  checked={task.completed} 
+                                  onCheckedChange={() => toggleTask(task.id)} 
+                                  className="mt-1"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className={cn(
+                                    "text-sm leading-tight break-words transition-all",
+                                    task.completed && "text-muted-foreground line-through decoration-muted-foreground/50"
+                                  )}>
+                                    {task.text}
+                                  </p>
+                                  {task.dueDate && (
+                                    <p className="text-[10px] mt-1 font-medium text-primary flex items-center gap-1">
+                                      <CalendarIcon className="h-2.5 w-2.5" />
+                                      Due: {format(task.dueDate, "MMM d")} 
+                                      ({differenceInCalendarDays(task.dueDate, today)} days left)
+                                    </p>
+                                  )}
+                                </div>
+                                <button 
+                                  onClick={() => deleteTask(task.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </ScrollArea>
+                    
+                    <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm space-y-3">
+                      <div className="flex gap-2">
+                        <Input 
+                          placeholder="Add a new task..." 
+                          value={newTaskText}
+                          onChange={(e) => setNewTaskText(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="icon" className={cn(!newTaskDate && "text-muted-foreground")}>
+                                <CalendarIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar
+                                mode="single"
+                                selected={newTaskDate}
+                                onSelect={setNewTaskDate}
+                                disabled={(date) => date < today}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                        </Popover>
+                        <Button type="submit" size="icon" disabled={!newTaskText.trim()} onClick={addTask}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {newTaskDate && (
+                        <p className="text-[10px] font-medium text-primary flex items-center gap-1 animate-in slide-in-from-top-1">
+                          <CalendarIcon className="h-2.5 w-2.5" />
+                          Due date set for {format(newTaskDate, "MMM d")}
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           </div>
           
         </div>
