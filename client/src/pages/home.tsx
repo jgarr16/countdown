@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, startOfToday } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +7,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, CloudOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { saveToGitHub, loadFromGitHub, setGitHubToken, getGitHubToken } from "@/lib/githubStorage";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 // Types
 type Task = {
@@ -25,7 +28,7 @@ type ExcludedDate = {
   comment?: string;
 };
 
-// Hook for localStorage persistence
+// Hook for localStorage persistence with GitHub sync
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
@@ -65,6 +68,89 @@ export default function Home() {
   const [targetDate, setTargetDate] = useLocalStorage<Date | undefined>("daycount-target", undefined);
   const [excludedDates, setExcludedDates] = useLocalStorage<ExcludedDate[]>("daycount-excluded", []);
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [githubToken, setGithubTokenState] = useState<string | null>(() => getGitHubToken());
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
+
+  // Load data from GitHub on mount
+  useEffect(() => {
+    const loadFromGitHubAsync = async () => {
+      if (!githubToken) return;
+      
+      try {
+        setIsSyncing(true);
+        const data = await loadFromGitHub();
+        if (data) {
+          // Only load if we don't have local data (to avoid overwriting)
+          const currentTargetDate = localStorage.getItem("daycount-target");
+          const currentExcluded = localStorage.getItem("daycount-excluded");
+          const currentTasks = localStorage.getItem("daycount-tasks");
+          
+          if (!currentTargetDate && data.targetDate) {
+            setTargetDate(new Date(data.targetDate));
+          }
+          if ((!currentExcluded || currentExcluded === "[]") && data.excludedDates.length > 0) {
+            setExcludedDates(data.excludedDates);
+          }
+          if ((!currentTasks || currentTasks === "[]") && data.tasks.length > 0) {
+            setTasks(data.tasks.map(t => ({
+              ...t,
+              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+            })));
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load from GitHub:", error);
+      } finally {
+        setIsSyncing(false);
+      }
+    };
+    
+    loadFromGitHubAsync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  // Sync to GitHub when data changes (debounced)
+  useEffect(() => {
+    if (!githubToken) return;
+    
+    const timeoutId = setTimeout(async () => {
+      try {
+        setIsSyncing(true);
+        await saveToGitHub({
+          targetDate: targetDate?.toISOString(),
+          excludedDates,
+          tasks: tasks.map(t => ({
+            ...t,
+            dueDate: t.dueDate?.toISOString()
+          }))
+        });
+      } catch (error) {
+        console.error("Failed to save to GitHub:", error);
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 1000); // Debounce by 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [targetDate, excludedDates, tasks, githubToken]);
+
+  const handleSetToken = () => {
+    if (tokenInput.trim()) {
+      setGitHubToken(tokenInput.trim());
+      setGithubTokenState(tokenInput.trim());
+      setShowTokenDialog(false);
+      setTokenInput("");
+      toast({ title: "GitHub sync enabled", description: "Your data will now sync across devices." });
+    }
+  };
+
+  const handleRemoveToken = () => {
+    setGitHubToken(null);
+    setGithubTokenState(null);
+    toast({ title: "GitHub sync disabled", description: "Data will only be stored locally." });
+  };
 
   // -- UI State --
   const [isExclusionsOpen, setIsExclusionsOpen] = useState(false);
@@ -154,6 +240,78 @@ export default function Home() {
             <h1 className="text-4xl font-extrabold tracking-tighter text-primary">Countdown!</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2" title={githubToken ? "GitHub sync enabled" : "Enable GitHub sync"}>
+                  {githubToken ? (
+                    <>
+                      <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
+                      <span>Sync</span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudOff className="h-4 w-4" />
+                      <span>Sync</span>
+                    </>
+                  )}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>GitHub Sync Settings</DialogTitle>
+                  <DialogDescription>
+                    Enable GitHub sync to persist your data across devices. Your data will be stored in a private GitHub Gist.
+                  </DialogDescription>
+                </DialogHeader>
+                {githubToken ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Cloud className="h-4 w-4 text-primary" />
+                      <span>GitHub sync is enabled</span>
+                    </div>
+                    <Button variant="destructive" onClick={handleRemoveToken} className="w-full">
+                      Disable GitHub Sync
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      To create a GitHub Personal Access Token:
+                      <br />
+                      1. Go to GitHub Settings → Developer settings → Personal access tokens
+                      <br />
+                      2. Generate a new token with the "gist" scope
+                      <br />
+                      3. Paste it here to enable sync
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="token">GitHub Personal Access Token</Label>
+                      <Input
+                        id="token"
+                        type="password"
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        value={tokenInput}
+                        onChange={(e) => setTokenInput(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleSetToken} className="w-full" disabled={!tokenInput.trim()}>
+                      Enable Sync
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      To create a GitHub Personal Access Token:
+                      <br />
+                      1. Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary underline">GitHub Settings → Developer settings → Personal access tokens</a>
+                      <br />
+                      2. Click "Generate new token (classic)"
+                      <br />
+                      3. Select the "gist" scope
+                      <br />
+                      4. Copy the token and paste it above
+                    </p>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className={cn(
