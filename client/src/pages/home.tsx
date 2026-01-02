@@ -181,13 +181,13 @@ export default function Home() {
         </header>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        <div className="flex flex-col md:grid md:grid-cols-12 gap-8 items-start">
           
           {/* Left Column: Stats & Setup (Span 7) */}
-          <div className="md:col-span-7 space-y-6 min-w-0">
+          <div className="w-full md:col-span-7 space-y-8 min-w-0">
             
             {/* Countdown Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <Card className="bg-card shadow-sm border-border/60">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calendar Days</CardTitle>
@@ -262,8 +262,8 @@ export default function Home() {
           </div>
 
           {/* Right Column: Tasks (Span 5) */}
-          <div className="md:col-span-5 h-full">
-            <Card className="h-full shadow-sm border-border/60 flex flex-col">
+          <div className="w-full md:col-span-5 md:sticky md:top-8">
+            <Card className="shadow-sm border-border/60 flex flex-col min-h-[500px]">
               <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" /> 
