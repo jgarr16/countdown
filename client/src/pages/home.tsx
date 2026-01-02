@@ -289,7 +289,7 @@ export default function Home() {
               <CardHeader className="pb-4 border-b border-border/40 bg-muted/20 text-center">
                 <CardTitle className="flex items-center justify-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-primary" /> 
-                  Session Tasks
+                  Tasks
                 </CardTitle>
               </CardHeader>
               
