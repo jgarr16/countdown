@@ -223,26 +223,28 @@ export default function Home() {
                   Select dates below to mark them as non-working days.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pb-6">
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="multiple"
-                    selected={excludedDatesObj}
-                    onSelect={(_, date) => toggleExclusion(date)}
-                    className="rounded-md border p-3 w-full max-w-full sm:max-w-md pointer-events-auto"
-                    disabled={(date) => date < today}
-                    modifiers={{
-                      weekend: (date) => isSaturday(date) || isSunday(date)
-                    }}
-                    modifiersStyles={{
-                      weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
-                    }}
-                    showOutsideDays={false}
-                  />
+              <CardContent className="pb-6 flex flex-col gap-6">
+                <div className="flex justify-center w-full">
+                  <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
+                    <Calendar
+                      mode="multiple"
+                      selected={excludedDatesObj}
+                      onSelect={(_, date) => toggleExclusion(date)}
+                      className="w-full"
+                      disabled={(date) => date < today}
+                      modifiers={{
+                        weekend: (date) => isSaturday(date) || isSunday(date)
+                      }}
+                      modifiersStyles={{
+                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 }
+                      }}
+                      showOutsideDays={false}
+                    />
+                  </div>
                 </div>
                 
                 {excludedDates.length > 0 && (
-                  <div className="mt-6">
+                  <div className="pt-4 border-t border-border/40">
                     <h4 className="text-sm font-medium mb-3 text-muted-foreground">Excluded Dates</h4>
                     <div className="flex flex-wrap gap-2">
                       {excludedDatesObj.sort((a,b) => a.getTime() - b.getTime()).map((date) => (
