@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import { BrowserRouter } from "react-router-dom";
 
 function Router() {
   return (
@@ -20,7 +21,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <BrowserRouter basename="/countdown">
+          <Router />
+        </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
   );
