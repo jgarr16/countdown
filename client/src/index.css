@@ -129,3 +129,22 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Slash through expired/past days on the calendar */
+.calendar-day-expired {
+  position: relative;
+}
+
+.calendar-day-expired::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 15%;
+  width: 70%;
+  height: 1.5px;
+  background: hsl(var(--muted-foreground));
+  transform: rotate(-45deg);
+  transform-origin: center;
+  pointer-events: none;
+  opacity: 0.6;
+}

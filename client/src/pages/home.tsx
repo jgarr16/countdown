@@ -446,7 +446,11 @@ export default function Home() {
                       disabled={(date) => date < today}
                       modifiers={{
                         weekend: (date) => isSaturday(date) || isSunday(date),
-                        tasked: taskDates
+                        tasked: taskDates,
+                        expired: (date) => date < today
+                      }}
+                      modifiersClassNames={{
+                        expired: "calendar-day-expired"
                       }}
                       modifiersStyles={{
                         weekend: { color: "var(--muted-foreground)", opacity: 0.5 },
