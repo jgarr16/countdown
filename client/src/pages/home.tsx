@@ -448,10 +448,12 @@ export default function Home() {
                       modifiers={{
                         weekend: (date) => isSaturday(date) || isSunday(date),
                         tasked: taskDates,
-                        expired: (date) => date < today
+                        expired: (date) => date < today,
+                        targetDay: safeTargetDate ? [safeTargetDate] : []
                       }}
                       modifiersClassNames={{
-                        expired: "calendar-day-expired"
+                        expired: "calendar-day-expired",
+                        targetDay: "calendar-day-target"
                       }}
                       modifiersStyles={{
                         weekend: { color: "var(--muted-foreground)", opacity: 0.5 },
