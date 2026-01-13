@@ -222,8 +222,9 @@ export default function Home() {
   const today = effectiveToday; // Use effective today (accounts for 5 PM cutoff)
   const safeTargetDate = targetDate ? new Date(targetDate) : undefined;
   
+  // Calendar days remaining (inclusive of both today and target day)
   const calendarDaysRemaining = safeTargetDate 
-    ? differenceInCalendarDays(safeTargetDate, today) 
+    ? differenceInCalendarDays(safeTargetDate, today) + 1
     : 0;
 
   const calculateWorkingDays = () => {
