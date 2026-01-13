@@ -149,18 +149,13 @@
   opacity: 0.6;
 }
 
-/* Star indicator for target date on calendar */
+/* Target date highlight on calendar */
 .calendar-day-target {
   position: relative;
 }
 
-.calendar-day-target::before {
-  content: '★';
-  position: absolute;
-  top: 2px;
-  right: 3px;
-  font-size: 8px;
-  color: hsl(var(--primary));
-  pointer-events: none;
-  line-height: 1;
+.calendar-day-target > button {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-radius: var(--radius) !important;
 }
