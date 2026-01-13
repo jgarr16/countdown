@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, startOfToday } from "date-fns";
+import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, startOfToday, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -157,9 +157,69 @@ export default function Home() {
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
+  
+  // The day ends at 5 PM local time - after 5 PM, the day is considered "over"
+  const END_OF_DAY_HOUR = 17; // 5 PM
+  
+  // Get the effective "today" - after 5 PM, the current day is over so we use tomorrow
+  const getEffectiveToday = useCallback(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour >= END_OF_DAY_HOUR) {
+      // After 5 PM - day is over, use tomorrow
+      return addDays(startOfToday(), 1);
+    }
+    return startOfToday();
+  }, []);
+  
+  // State to trigger re-renders when the day changes at 5 PM
+  const [effectiveToday, setEffectiveToday] = useState<Date>(getEffectiveToday);
+  
+  // Set up a timer to update the effective day at 5 PM
+  useEffect(() => {
+    const checkAndUpdate = () => {
+      const newEffectiveToday = getEffectiveToday();
+      if (newEffectiveToday.getTime() !== effectiveToday.getTime()) {
+        setEffectiveToday(newEffectiveToday);
+        toast({
+          title: "Day complete!",
+          description: "The workday has ended. Countdown updated.",
+        });
+      }
+    };
+    
+    // Calculate time until next 5 PM
+    const now = new Date();
+    const currentHour = now.getHours();
+    let next5PM: Date;
+    
+    if (currentHour >= END_OF_DAY_HOUR) {
+      // Already past 5 PM today, next trigger is tomorrow at 5 PM
+      next5PM = setMilliseconds(setSeconds(setMinutes(setHours(addDays(startOfToday(), 1), END_OF_DAY_HOUR), 0), 0), 0);
+    } else {
+      // Before 5 PM, next trigger is today at 5 PM
+      next5PM = setMilliseconds(setSeconds(setMinutes(setHours(startOfToday(), END_OF_DAY_HOUR), 0), 0), 0);
+    }
+    
+    const msUntil5PM = next5PM.getTime() - now.getTime();
+    
+    // Set timeout for the next 5 PM transition
+    const timeoutId = setTimeout(() => {
+      checkAndUpdate();
+    }, msUntil5PM);
+    
+    // Also check every minute in case the user leaves the tab open
+    const intervalId = setInterval(checkAndUpdate, 60000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+  }, [effectiveToday, getEffectiveToday, toast]);
 
   // -- Computed Values --
-  const today = startOfToday();
+  const today = effectiveToday; // Use effective today (accounts for 5 PM cutoff)
   const safeTargetDate = targetDate ? new Date(targetDate) : undefined;
   
   const calendarDaysRemaining = safeTargetDate 
