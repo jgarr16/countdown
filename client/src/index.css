@@ -149,13 +149,30 @@
   opacity: 0.6;
 }
 
-/* Target date highlight on calendar */
+/* Target date star highlight on calendar */
 .calendar-day-target {
   position: relative;
 }
 
 .calendar-day-target > button {
-  background-color: hsl(var(--primary)) !important;
+  position: relative;
   color: hsl(var(--primary-foreground)) !important;
-  border-radius: var(--radius) !important;
+  background: transparent !important;
+}
+
+.calendar-day-target > button::before {
+  content: '★';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.5rem;
+  color: hsl(var(--primary));
+  z-index: 0;
+  line-height: 1;
+}
+
+.calendar-day-target > button > * {
+  position: relative;
+  z-index: 1;
 }
