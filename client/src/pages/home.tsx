@@ -7,13 +7,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, CloudOff } from "lucide-react";
+import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, CloudOff, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { saveToGitHub, loadFromGitHub, setGitHubToken, getGitHubToken } from "@/lib/githubStorage";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // Types
 type Task = {
@@ -296,108 +297,128 @@ export default function Home() {
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans text-foreground">
       <div className="max-w-2xl mx-auto space-y-8">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
-          <div>
-            <h1 className="text-4xl font-extrabold tracking-tighter text-primary">Countdown!</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2" title={githubToken ? "GitHub sync enabled" : "Enable GitHub sync"}>
-                  {githubToken ? (
-                    <>
-                      <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
-                      <span>Sync</span>
-                    </>
-                  ) : (
-                    <>
-                      <CloudOff className="h-4 w-4" />
-                      <span>Sync</span>
-                    </>
-                  )}
+        <header className="relative flex items-center justify-center pb-6 border-b border-border">
+          <h1 className="text-4xl font-extrabold tracking-tighter text-primary">Countdown!</h1>
+          
+          {/* Settings dropdown - positioned on the right */}
+          <div className="absolute right-0 top-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                  <Settings className="h-5 w-5" />
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>GitHub Sync Settings</DialogTitle>
-                  <DialogDescription>
-                    Enable GitHub sync to persist your data across devices. Your data will be stored in a private GitHub Gist.
-                  </DialogDescription>
-                </DialogHeader>
-                {githubToken ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Cloud className="h-4 w-4 text-primary" />
-                      <span>GitHub sync is enabled</span>
-                    </div>
-                    <Button variant="destructive" onClick={handleRemoveToken} className="w-full">
-                      Disable GitHub Sync
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      To create a GitHub Personal Access Token:
-                      <br />
-                      1. Go to GitHub Settings → Developer settings → Personal access tokens
-                      <br />
-                      2. Generate a new token with the "gist" scope
-                      <br />
-                      3. Paste it here to enable sync
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="token">GitHub Personal Access Token</Label>
-                      <Input
-                        id="token"
-                        type="password"
-                        placeholder="ghp_xxxxxxxxxxxx"
-                        value={tokenInput}
-                        onChange={(e) => setTokenInput(e.target.value)}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {/* Target Date */}
+                <div className="p-2">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Target Date</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !targetDate && "text-muted-foreground"
+                      )}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {targetDate ? format(new Date(targetDate), "PPP") : <span>Pick a target date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        mode="single"
+                        selected={safeTargetDate}
+                        onSelect={(date) => setTargetDate(date)}
+                        disabled={(date) => date < today}
+                        initialFocus
                       />
-                    </div>
-                    <Button onClick={handleSetToken} className="w-full" disabled={!tokenInput.trim()}>
-                      Enable Sync
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      To create a GitHub Personal Access Token:
-                      <br />
-                      1. Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary underline">GitHub Settings → Developer settings → Personal access tokens</a>
-                      <br />
-                      2. Click "Generate new token (classic)"
-                      <br />
-                      3. Select the "gist" scope
-                      <br />
-                      4. Copy the token and paste it above
-                    </p>
-                  </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Sync */}
+                <DropdownMenuItem className="p-0" onSelect={(e) => e.preventDefault()}>
+                  <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
+                    <DialogTrigger asChild>
+                      <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm">
+                        {githubToken ? (
+                          <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
+                        ) : (
+                          <CloudOff className="h-4 w-4" />
+                        )}
+                        <span>{githubToken ? "Sync Settings" : "Enable Sync"}</span>
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>GitHub Sync Settings</DialogTitle>
+                        <DialogDescription>
+                          Enable GitHub sync to persist your data across devices. Your data will be stored in a private GitHub Gist.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {githubToken ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Cloud className="h-4 w-4 text-primary" />
+                            <span>GitHub sync is enabled</span>
+                          </div>
+                          <Button variant="destructive" onClick={handleRemoveToken} className="w-full">
+                            Disable GitHub Sync
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            To create a GitHub Personal Access Token:
+                            <br />
+                            1. Go to GitHub Settings → Developer settings → Personal access tokens
+                            <br />
+                            2. Generate a new token with the "gist" scope
+                            <br />
+                            3. Paste it here to enable sync
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="token">GitHub Personal Access Token</Label>
+                            <Input
+                              id="token"
+                              type="password"
+                              placeholder="ghp_xxxxxxxxxxxx"
+                              value={tokenInput}
+                              onChange={(e) => setTokenInput(e.target.value)}
+                            />
+                          </div>
+                          <Button onClick={handleSetToken} className="w-full" disabled={!tokenInput.trim()}>
+                            Enable Sync
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            To create a GitHub Personal Access Token:
+                            <br />
+                            1. Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary underline">GitHub Settings → Developer settings → Personal access tokens</a>
+                            <br />
+                            2. Click "Generate new token (classic)"
+                            <br />
+                            3. Select the "gist" scope
+                            <br />
+                            4. Copy the token and paste it above
+                          </p>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                </DropdownMenuItem>
+                
+                {/* Reset */}
+                {targetDate && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={resetAll} className="text-destructive focus:text-destructive">
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset All Data
+                    </DropdownMenuItem>
+                  </>
                 )}
-              </DialogContent>
-            </Dialog>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !targetDate && "text-muted-foreground"
-                )}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {targetDate ? format(new Date(targetDate), "PPP") : <span>Pick a target date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={safeTargetDate}
-                  onSelect={(date) => setTargetDate(date)}
-                  disabled={(date) => date < today}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            {targetDate && (
-              <Button variant="ghost" size="icon" onClick={resetAll} title="Reset All">
-                <RotateCcw className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
-              </Button>
-            )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
