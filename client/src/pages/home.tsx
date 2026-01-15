@@ -7,13 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, CloudOff, Settings } from "lucide-react";
+import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { saveToGitHub, loadFromGitHub, setGitHubToken, getGitHubToken, getGitHubGistId, setGitHubGistId } from "@/lib/githubStorage";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { saveToFirebase, loadFromFirebase } from "@/lib/firebaseStorage";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // Types
@@ -29,7 +27,7 @@ type ExcludedDate = {
   comment?: string;
 };
 
-// Hook for localStorage persistence with GitHub sync
+// Hook for localStorage persistence with cloud sync
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
@@ -70,12 +68,9 @@ export default function Home() {
   const [excludedDates, setExcludedDates] = useLocalStorage<ExcludedDate[]>("daycount-excluded", []);
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [githubToken, setGithubTokenState] = useState<string | null>(() => getGitHubToken());
-  const [showTokenDialog, setShowTokenDialog] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
-  const [syncCodeInput, setSyncCodeInput] = useState("");
+  const [hasLoadedRemote, setHasLoadedRemote] = useState(false);
 
-  const applyGitHubData = useCallback((data: { targetDate?: string; excludedDates: ExcludedDate[]; tasks: Task[] }) => {
+  const applyRemoteData = useCallback((data: { targetDate?: string; excludedDates: ExcludedDate[]; tasks: Task[] }) => {
     const currentTargetDate = localStorage.getItem("daycount-target");
     const currentExcluded = localStorage.getItem("daycount-excluded");
     const currentTasks = localStorage.getItem("daycount-tasks");
@@ -94,37 +89,35 @@ export default function Home() {
     }
   }, [setExcludedDates, setTargetDate, setTasks]);
 
-  // Load data from GitHub on mount
+  // Load data from Firebase on mount
   useEffect(() => {
-    const loadFromGitHubAsync = async () => {
-      if (!githubToken) return;
-      
+    const loadFromFirebaseAsync = async () => {
       try {
         setIsSyncing(true);
-        const data = await loadFromGitHub();
+        const data = await loadFromFirebase();
         if (data) {
           // Only load if we don't have local data (to avoid overwriting)
-          applyGitHubData(data);
+          applyRemoteData(data);
         }
       } catch (error) {
-        console.error("Failed to load from GitHub:", error);
+        console.error("Failed to load from Firebase:", error);
       } finally {
+        setHasLoadedRemote(true);
         setIsSyncing(false);
       }
     };
     
-    loadFromGitHubAsync();
+    loadFromFirebaseAsync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
-  // Sync to GitHub when data changes (debounced)
+  // Sync to Firebase when data changes (debounced)
   useEffect(() => {
-    if (!githubToken) return;
-    
+    if (!hasLoadedRemote) return;
     const timeoutId = setTimeout(async () => {
       try {
         setIsSyncing(true);
-        await saveToGitHub({
+        await saveToFirebase({
           targetDate: targetDate?.toISOString(),
           excludedDates,
           tasks: tasks.map(t => ({
@@ -133,80 +126,14 @@ export default function Home() {
           }))
         });
       } catch (error) {
-        console.error("Failed to save to GitHub:", error);
+        console.error("Failed to save to Firebase:", error);
       } finally {
         setIsSyncing(false);
       }
     }, 1000); // Debounce by 1 second
 
     return () => clearTimeout(timeoutId);
-  }, [targetDate, excludedDates, tasks, githubToken]);
-
-  const handleSetToken = () => {
-    if (tokenInput.trim()) {
-      setGitHubToken(tokenInput.trim());
-      setGithubTokenState(tokenInput.trim());
-      setShowTokenDialog(false);
-      setTokenInput("");
-      toast({ title: "GitHub sync enabled", description: "Your data will now sync across devices." });
-    }
-  };
-
-  const handleRemoveToken = () => {
-    setGitHubToken(null);
-    setGithubTokenState(null);
-    toast({ title: "GitHub sync disabled", description: "Data will only be stored locally." });
-  };
-
-  const buildSyncCode = () => {
-    const token = getGitHubToken();
-    const gistId = getGitHubGistId();
-    if (!token || !gistId) return null;
-    return btoa(JSON.stringify({ token, gistId }));
-  };
-
-  const handleCopySyncCode = async () => {
-    const code = buildSyncCode();
-    if (!code) {
-      toast({ title: "Sync code not ready", description: "Save once to GitHub to generate a sync code." });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(code);
-      toast({ title: "Sync code copied", description: "Paste it into the home screen app to enable sync." });
-    } catch (error) {
-      setSyncCodeInput(code);
-      toast({ title: "Copy failed", description: "Sync code placed in the field below." });
-    }
-  };
-
-  const handleImportSyncCode = async () => {
-    const trimmed = syncCodeInput.trim();
-    if (!trimmed) return;
-    try {
-      const decoded = atob(trimmed);
-      const parsed = JSON.parse(decoded);
-      if (!parsed?.token || !parsed?.gistId) {
-        throw new Error("Invalid sync code");
-      }
-
-      setGitHubToken(parsed.token);
-      setGitHubGistId(parsed.gistId);
-      setGithubTokenState(parsed.token);
-      setSyncCodeInput("");
-      toast({ title: "Sync enabled", description: "Fetching your data from GitHub..." });
-
-      setIsSyncing(true);
-      const data = await loadFromGitHub();
-      if (data) {
-        applyGitHubData(data);
-      }
-    } catch (error) {
-      toast({ title: "Invalid sync code", description: "Please check the code and try again." });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  }, [targetDate, excludedDates, tasks, hasLoadedRemote]);
 
   // -- UI State --
   const [isExclusionsOpen, setIsExclusionsOpen] = useState(false);
@@ -391,101 +318,10 @@ export default function Home() {
                 
                 <DropdownMenuSeparator />
                 
-                {/* Sync */}
-                <DropdownMenuItem className="p-0" onSelect={(e) => e.preventDefault()}>
-                  <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
-                    <DialogTrigger asChild>
-                      <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm">
-                        {githubToken ? (
-                          <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
-                        ) : (
-                          <CloudOff className="h-4 w-4" />
-                        )}
-                        <span>{githubToken ? "Sync Settings" : "Enable Sync"}</span>
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>GitHub Sync Settings</DialogTitle>
-                        <DialogDescription>
-                          Enable GitHub sync to persist your data across devices. Your data will be stored in a private GitHub Gist.
-                        </DialogDescription>
-                      </DialogHeader>
-                      {githubToken ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Cloud className="h-4 w-4 text-primary" />
-                            <span>GitHub sync is enabled</span>
-                          </div>
-                          <Button variant="destructive" onClick={handleRemoveToken} className="w-full">
-                            Disable GitHub Sync
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            To create a GitHub Personal Access Token:
-                            <br />
-                            1. Go to GitHub Settings → Developer settings → Personal access tokens
-                            <br />
-                            2. Generate a new token with the "gist" scope
-                            <br />
-                            3. Paste it here to enable sync
-                          </p>
-                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Sync Transfer Code</p>
-                      <p className="text-xs text-muted-foreground">Use this once to enable sync on your home screen app.</p>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={handleCopySyncCode}
-                        disabled={!getGitHubGistId()}
-                      >
-                        Copy Sync Code
-                      </Button>
-                      {!getGitHubGistId() && (
-                        <p className="text-xs text-muted-foreground">Save once to GitHub to generate a code.</p>
-                      )}
-                    </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="token">GitHub Personal Access Token</Label>
-                            <Input
-                              id="token"
-                              type="password"
-                              placeholder="ghp_xxxxxxxxxxxx"
-                              value={tokenInput}
-                              onChange={(e) => setTokenInput(e.target.value)}
-                            />
-                          </div>
-                          <Button onClick={handleSetToken} className="w-full" disabled={!tokenInput.trim()}>
-                            Enable Sync
-                          </Button>
-                          <p className="text-xs text-muted-foreground">
-                            To create a GitHub Personal Access Token:
-                            <br />
-                            1. Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-primary underline">GitHub Settings → Developer settings → Personal access tokens</a>
-                            <br />
-                            2. Click "Generate new token (classic)"
-                            <br />
-                            3. Select the "gist" scope
-                            <br />
-                            4. Copy the token and paste it above
-                          </p>
-                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">Sync Transfer Code</p>
-                      <Input
-                        placeholder="Paste sync code"
-                        value={syncCodeInput}
-                        onChange={(e) => setSyncCodeInput(e.target.value)}
-                      />
-                      <Button onClick={handleImportSyncCode} className="w-full" disabled={!syncCodeInput.trim()}>
-                        Import Sync
-                      </Button>
-                    </div>
-                        </div>
-                      )}
-                    </DialogContent>
-                  </Dialog>
+                {/* Sync Status */}
+                <DropdownMenuItem disabled className="gap-2">
+                  <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
+                  <span>Cloud sync is automatic</span>
                 </DropdownMenuItem>
                 
                 {/* Reset */}
