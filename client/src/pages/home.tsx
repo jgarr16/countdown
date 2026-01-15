@@ -69,6 +69,11 @@ export default function Home() {
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasLoadedRemote, setHasLoadedRemote] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    state: "idle" | "loading" | "saving" | "saved" | "error";
+    message?: string;
+    at?: string;
+  }>({ state: "idle" });
 
   const applyRemoteData = useCallback((data: { targetDate?: string; excludedDates: ExcludedDate[]; tasks: Task[] }) => {
     const currentTargetDate = localStorage.getItem("daycount-target");
@@ -94,13 +99,18 @@ export default function Home() {
     const loadFromFirebaseAsync = async () => {
       try {
         setIsSyncing(true);
+        setSyncStatus({ state: "loading" });
         const data = await loadFromFirebase();
         if (data) {
           // Only load if we don't have local data (to avoid overwriting)
           applyRemoteData(data);
+          setSyncStatus({ state: "saved", at: new Date().toISOString() });
+        } else {
+          setSyncStatus({ state: "idle", message: "No cloud data found yet." });
         }
       } catch (error) {
         console.error("Failed to load from Firebase:", error);
+        setSyncStatus({ state: "error", message: "Failed to load from cloud." });
       } finally {
         setHasLoadedRemote(true);
         setIsSyncing(false);
@@ -117,6 +127,7 @@ export default function Home() {
     const timeoutId = setTimeout(async () => {
       try {
         setIsSyncing(true);
+        setSyncStatus({ state: "saving" });
         await saveToFirebase({
           targetDate: targetDate?.toISOString(),
           excludedDates,
@@ -125,8 +136,10 @@ export default function Home() {
             dueDate: t.dueDate?.toISOString()
           }))
         });
+        setSyncStatus({ state: "saved", at: new Date().toISOString() });
       } catch (error) {
         console.error("Failed to save to Firebase:", error);
+        setSyncStatus({ state: "error", message: "Failed to save to cloud." });
       } finally {
         setIsSyncing(false);
       }
@@ -319,10 +332,36 @@ export default function Home() {
                 <DropdownMenuSeparator />
                 
                 {/* Sync Status */}
-                <DropdownMenuItem disabled className="gap-2">
-                  <Cloud className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
-                  <span>Cloud sync is automatic</span>
-                </DropdownMenuItem>
+                <div className="p-2 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Sync Status</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        syncStatus.state === "error" && "bg-destructive",
+                        syncStatus.state === "saving" && "bg-primary animate-pulse",
+                        syncStatus.state === "loading" && "bg-primary animate-pulse",
+                        syncStatus.state === "saved" && "bg-emerald-500",
+                        syncStatus.state === "idle" && "bg-muted-foreground"
+                      )}
+                    />
+                    <span>
+                      {syncStatus.state === "loading" && "Loading from cloud..."}
+                      {syncStatus.state === "saving" && "Saving to cloud..."}
+                      {syncStatus.state === "saved" && "Synced"}
+                      {syncStatus.state === "error" && "Sync error"}
+                      {syncStatus.state === "idle" && "Idle"}
+                    </span>
+                  </div>
+                  {syncStatus.message && (
+                    <p className="text-xs text-muted-foreground">{syncStatus.message}</p>
+                  )}
+                  {syncStatus.at && (
+                    <p className="text-xs text-muted-foreground">
+                      Last sync: {format(new Date(syncStatus.at), "MMM d, h:mm a")}
+                    </p>
+                  )}
+                </div>
                 
                 {/* Reset */}
                 {targetDate && (
