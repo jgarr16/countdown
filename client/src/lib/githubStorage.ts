@@ -165,4 +165,16 @@ export function getGitHubToken(): string | null {
   return getStoredValue(STORAGE_KEY_TOKEN);
 }
 
+export function getGitHubGistId(): string | null {
+  return getStoredValue(STORAGE_KEY_GIST_ID);
+}
+
+export function setGitHubGistId(gistId: string | null): void {
+  if (gistId) {
+    setStoredValue(STORAGE_KEY_GIST_ID, gistId);
+  } else {
+    removeStoredValue(STORAGE_KEY_GIST_ID);
+  }
+}
+
 

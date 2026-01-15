@@ -11,7 +11,7 @@ import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCirc
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { saveToGitHub, loadFromGitHub, setGitHubToken, getGitHubToken } from "@/lib/githubStorage";
+import { saveToGitHub, loadFromGitHub, setGitHubToken, getGitHubToken, getGitHubGistId, setGitHubGistId } from "@/lib/githubStorage";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -73,6 +73,26 @@ export default function Home() {
   const [githubToken, setGithubTokenState] = useState<string | null>(() => getGitHubToken());
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
+  const [syncCodeInput, setSyncCodeInput] = useState("");
+
+  const applyGitHubData = useCallback((data: { targetDate?: string; excludedDates: ExcludedDate[]; tasks: Task[] }) => {
+    const currentTargetDate = localStorage.getItem("daycount-target");
+    const currentExcluded = localStorage.getItem("daycount-excluded");
+    const currentTasks = localStorage.getItem("daycount-tasks");
+
+    if (!currentTargetDate && data.targetDate) {
+      setTargetDate(new Date(data.targetDate));
+    }
+    if ((!currentExcluded || currentExcluded === "[]") && data.excludedDates.length > 0) {
+      setExcludedDates(data.excludedDates);
+    }
+    if ((!currentTasks || currentTasks === "[]") && data.tasks.length > 0) {
+      setTasks(data.tasks.map(t => ({
+        ...t,
+        dueDate: t.dueDate ? new Date(t.dueDate) : undefined
+      })));
+    }
+  }, [setExcludedDates, setTargetDate, setTasks]);
 
   // Load data from GitHub on mount
   useEffect(() => {
@@ -84,22 +104,7 @@ export default function Home() {
         const data = await loadFromGitHub();
         if (data) {
           // Only load if we don't have local data (to avoid overwriting)
-          const currentTargetDate = localStorage.getItem("daycount-target");
-          const currentExcluded = localStorage.getItem("daycount-excluded");
-          const currentTasks = localStorage.getItem("daycount-tasks");
-          
-          if (!currentTargetDate && data.targetDate) {
-            setTargetDate(new Date(data.targetDate));
-          }
-          if ((!currentExcluded || currentExcluded === "[]") && data.excludedDates.length > 0) {
-            setExcludedDates(data.excludedDates);
-          }
-          if ((!currentTasks || currentTasks === "[]") && data.tasks.length > 0) {
-            setTasks(data.tasks.map(t => ({
-              ...t,
-              dueDate: t.dueDate ? new Date(t.dueDate) : undefined
-            })));
-          }
+          applyGitHubData(data);
         }
       } catch (error) {
         console.error("Failed to load from GitHub:", error);
@@ -151,6 +156,56 @@ export default function Home() {
     setGitHubToken(null);
     setGithubTokenState(null);
     toast({ title: "GitHub sync disabled", description: "Data will only be stored locally." });
+  };
+
+  const buildSyncCode = () => {
+    const token = getGitHubToken();
+    const gistId = getGitHubGistId();
+    if (!token || !gistId) return null;
+    return btoa(JSON.stringify({ token, gistId }));
+  };
+
+  const handleCopySyncCode = async () => {
+    const code = buildSyncCode();
+    if (!code) {
+      toast({ title: "Sync code not ready", description: "Save once to GitHub to generate a sync code." });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(code);
+      toast({ title: "Sync code copied", description: "Paste it into the home screen app to enable sync." });
+    } catch (error) {
+      setSyncCodeInput(code);
+      toast({ title: "Copy failed", description: "Sync code placed in the field below." });
+    }
+  };
+
+  const handleImportSyncCode = async () => {
+    const trimmed = syncCodeInput.trim();
+    if (!trimmed) return;
+    try {
+      const decoded = atob(trimmed);
+      const parsed = JSON.parse(decoded);
+      if (!parsed?.token || !parsed?.gistId) {
+        throw new Error("Invalid sync code");
+      }
+
+      setGitHubToken(parsed.token);
+      setGitHubGistId(parsed.gistId);
+      setGithubTokenState(parsed.token);
+      setSyncCodeInput("");
+      toast({ title: "Sync enabled", description: "Fetching your data from GitHub..." });
+
+      setIsSyncing(true);
+      const data = await loadFromGitHub();
+      if (data) {
+        applyGitHubData(data);
+      }
+    } catch (error) {
+      toast({ title: "Invalid sync code", description: "Please check the code and try again." });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // -- UI State --
@@ -374,6 +429,21 @@ export default function Home() {
                             <br />
                             3. Paste it here to enable sync
                           </p>
+                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Sync Transfer Code</p>
+                      <p className="text-xs text-muted-foreground">Use this once to enable sync on your home screen app.</p>
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleCopySyncCode}
+                        disabled={!getGitHubGistId()}
+                      >
+                        Copy Sync Code
+                      </Button>
+                      {!getGitHubGistId() && (
+                        <p className="text-xs text-muted-foreground">Save once to GitHub to generate a code.</p>
+                      )}
+                    </div>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -401,6 +471,17 @@ export default function Home() {
                             <br />
                             4. Copy the token and paste it above
                           </p>
+                    <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Sync Transfer Code</p>
+                      <Input
+                        placeholder="Paste sync code"
+                        value={syncCodeInput}
+                        onChange={(e) => setSyncCodeInput(e.target.value)}
+                      />
+                      <Button onClick={handleImportSyncCode} className="w-full" disabled={!syncCodeInput.trim()}>
+                        Import Sync
+                      </Button>
+                    </div>
                         </div>
                       )}
                     </DialogContent>
