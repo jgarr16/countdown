@@ -15,11 +15,11 @@ interface AppData {
 const firebaseConfig = {
   apiKey: "AIzaSyBRY7IXl_WpYyP9b19HT2Dq_qgV3T_e6k4",
   authDomain: "craigslist-gallery.firebaseapp.com",
-  databaseURL: "https://craigslist-gallery-default-rtdb.firebaseio.com",
-  projectId: "craigslist-gallery",
-  storageBucket: "craigslist-gallery.firebasestorage.app",
-  messagingSenderId: "1054501050420",
-  appId: "1:1054501050420:web:8cb8c243ae86eadf72d261",
+  databaseURL: "https://countdown-5b04f-default-rtdb.firebaseio.com",
+  projectId: "countdown-5b04f",
+  storageBucket: "countdown-5b04f.firebasestorage.app",
+  messagingSenderId: "9541926520",
+  appId: "1:9541926520:web:482c8eb97002dc9f14378d",
 };
 
 function getApp() {
