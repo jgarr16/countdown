@@ -11,6 +11,47 @@ const GIST_FILENAME = "countdown-data.json";
 const STORAGE_KEY_GIST_ID = "countdown-gist-id";
 const STORAGE_KEY_TOKEN = "github-token";
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(
+    new RegExp(`(?:^|; )${name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}=([^;]*)`)
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name: string, value: string): void {
+  if (typeof document === "undefined") return;
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
+  const secureFlag = isSecure ? " Secure;" : "";
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=31536000; SameSite=Strict;${secureFlag}`;
+}
+
+function deleteCookie(name: string): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Strict;`;
+}
+
+function getStoredValue(key: string): string | null {
+  const localValue = localStorage.getItem(key);
+  if (localValue) return localValue;
+
+  const cookieValue = getCookie(key);
+  if (cookieValue) {
+    localStorage.setItem(key, cookieValue);
+  }
+  return cookieValue;
+}
+
+function setStoredValue(key: string, value: string): void {
+  localStorage.setItem(key, value);
+  setCookie(key, value);
+}
+
+function removeStoredValue(key: string): void {
+  localStorage.removeItem(key);
+  deleteCookie(key);
+}
+
 interface AppData {
   targetDate?: string;
   excludedDates: Array<{ date: string; comment?: string }>;
@@ -23,14 +64,14 @@ interface AppData {
 }
 
 export async function saveToGitHub(data: AppData): Promise<void> {
-  const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+  const token = getStoredValue(STORAGE_KEY_TOKEN);
   if (!token) {
     // No token, skip GitHub sync
     return;
   }
 
   try {
-    const gistId = localStorage.getItem(STORAGE_KEY_GIST_ID);
+    const gistId = getStoredValue(STORAGE_KEY_GIST_ID);
     const url = gistId
       ? `https://api.github.com/gists/${gistId}`
       : "https://api.github.com/gists";
@@ -66,7 +107,7 @@ export async function saveToGitHub(data: AppData): Promise<void> {
 
     const result = await response.json();
     if (!gistId && result.id) {
-      localStorage.setItem(STORAGE_KEY_GIST_ID, result.id);
+      setStoredValue(STORAGE_KEY_GIST_ID, result.id);
     }
   } catch (error) {
     console.error("Failed to save to GitHub:", error);
@@ -75,8 +116,8 @@ export async function saveToGitHub(data: AppData): Promise<void> {
 }
 
 export async function loadFromGitHub(): Promise<AppData | null> {
-  const token = localStorage.getItem(STORAGE_KEY_TOKEN);
-  const gistId = localStorage.getItem(STORAGE_KEY_GIST_ID);
+  const token = getStoredValue(STORAGE_KEY_TOKEN);
+  const gistId = getStoredValue(STORAGE_KEY_GIST_ID);
 
   if (!token || !gistId) {
     return null;
@@ -93,7 +134,7 @@ export async function loadFromGitHub(): Promise<AppData | null> {
     if (!response.ok) {
       if (response.status === 404) {
         // Gist not found, clear the ID
-        localStorage.removeItem(STORAGE_KEY_GIST_ID);
+        removeStoredValue(STORAGE_KEY_GIST_ID);
       }
       return null;
     }
@@ -113,15 +154,15 @@ export async function loadFromGitHub(): Promise<AppData | null> {
 
 export function setGitHubToken(token: string | null): void {
   if (token) {
-    localStorage.setItem(STORAGE_KEY_TOKEN, token);
+    setStoredValue(STORAGE_KEY_TOKEN, token);
   } else {
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
-    localStorage.removeItem(STORAGE_KEY_GIST_ID);
+    removeStoredValue(STORAGE_KEY_TOKEN);
+    removeStoredValue(STORAGE_KEY_GIST_ID);
   }
 }
 
 export function getGitHubToken(): string | null {
-  return localStorage.getItem(STORAGE_KEY_TOKEN);
+  return getStoredValue(STORAGE_KEY_TOKEN);
 }
 
 
