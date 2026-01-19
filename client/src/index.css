@@ -209,6 +209,17 @@
   @apply bg-black/40 backdrop-blur-2xl border border-white/5;
 }
 
+/* Ensure calendar days inherit the correct text color (fixes invisible white-on-white) */
+.rdp-day {
+  color: hsl(var(--foreground)) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure selected days have correct contrast */
+.rdp-day_selected {
+  color: hsl(var(--primary-foreground)) !important;
+}
+
 /* Force weekend visibility */
 .rdp-table tbody tr td:first-child .rdp-day,
 .rdp-table tbody tr td:last-child .rdp-day {
