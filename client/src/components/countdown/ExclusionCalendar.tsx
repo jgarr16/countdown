@@ -57,7 +57,8 @@ export function ExclusionCalendar({
                                     }}
                                     modifiersClassNames={{
                                         expired: "calendar-day-expired opacity-20",
-                                        targetDay: "calendar-day-target bg-primary/20 text-primary font-bold ring-2 ring-primary/50"
+                                        targetDay: "calendar-day-target bg-primary/20 text-primary font-bold ring-2 ring-primary/50",
+                                        weekend: "text-foreground opacity-100"
                                     }}
                                     modifiersStyles={{
                                         tasked: {
