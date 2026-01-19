@@ -60,7 +60,7 @@ export function ExclusionCalendar({
                                         targetDay: "calendar-day-target bg-primary/20 text-primary font-bold ring-2 ring-primary/50"
                                     }}
                                     modifiersStyles={{
-                                        weekend: { color: "rgba(255,255,255,0.2)", opacity: 0.5 },
+                                        weekend: { color: "rgba(255,255,255,0.7)", opacity: 1 },
                                         tasked: {
                                             borderBottom: "3px solid var(--primary)",
                                             borderRadius: "0px"
