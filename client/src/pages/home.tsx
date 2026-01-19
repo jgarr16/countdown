@@ -59,6 +59,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
 }
 
 export default function Home() {
+  console.log("Home component initializing...");
   const { toast } = useToast();
 
   // -- Persistent State --
@@ -89,6 +90,7 @@ export default function Home() {
 
   // Load from Firebase
   useEffect(() => {
+    console.log("Home init effect running...");
     const init = async () => {
       try {
         setSyncStatus({ state: "loading" });
@@ -212,6 +214,7 @@ export default function Home() {
     setTasks((prev: Task[]) => prev.filter((t: Task) => t.id !== id));
   };
 
+  console.log("Home component rendering JSX...");
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-primary/30">
       <div className="max-w-4xl mx-auto px-6 py-12 space-y-12">
