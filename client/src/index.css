@@ -126,53 +126,73 @@
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    @apply font-sans antialiased bg-[#050505] text-foreground;
   }
 }
 
-/* Slash through expired/past days on the calendar */
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Selection */
+::selection {
+  background: hsl(var(--primary) / 0.3);
+  color: white;
+}
+
+/* Calendar Styles */
 .calendar-day-expired {
   position: relative;
+  opacity: 0.3;
 }
 
 .calendar-day-expired::after {
   content: '';
   position: absolute;
   top: 50%;
-  left: 15%;
-  width: 70%;
-  height: 1.5px;
-  background: hsl(var(--muted-foreground));
+  left: 20%;
+  width: 60%;
+  height: 1px;
+  background: currentColor;
   transform: rotate(-45deg);
-  transform-origin: center;
   pointer-events: none;
-  opacity: 0.6;
 }
 
-/* Target date star highlight on calendar */
 .calendar-day-target {
-  position: relative;
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-[#050505] rounded-full transition-all duration-500 scale-110 shadow-[0_0_15px_rgba(var(--primary),0.5)];
 }
 
-.calendar-day-target > button {
-  position: relative;
-  color: hsl(var(--primary-foreground)) !important;
-  background: transparent !important;
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
 }
 
-.calendar-day-target > button::before {
-  content: '★';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 2.5rem;
-  color: hsl(var(--primary));
-  z-index: 0;
-  line-height: 1;
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
-.calendar-day-target > button > * {
-  position: relative;
-  z-index: 1;
+/* Glassmorphism Utilities */
+.glass {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10;
+}
+
+.glass-dark {
+  @apply bg-black/40 backdrop-blur-2xl border border-white/5;
 }

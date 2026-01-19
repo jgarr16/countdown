@@ -1,18 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { format, differenceInCalendarDays, isSaturday, isSunday, addDays, startOfToday, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Calendar as CalendarIcon, Briefcase, Trash2, RotateCcw, Plus, CheckCircle2, ChevronDown, ChevronUp, Cloud, Settings } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { addDays, startOfToday, setHours, setMinutes, setSeconds, setMilliseconds } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { saveToFirebase, loadFromFirebase } from "@/lib/firebaseStorage";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AppHeader } from "@/components/countdown/AppHeader";
+import { CountdownStats } from "@/components/countdown/CountdownStats";
+import { TaskList } from "@/components/countdown/TaskList";
+import { ExclusionCalendar } from "@/components/countdown/ExclusionCalendar";
+import { differenceInCalendarDays, isSaturday, isSunday } from "date-fns";
 
 // Types
 type Task = {
@@ -27,20 +21,23 @@ type ExcludedDate = {
   comment?: string;
 };
 
-// Hook for localStorage persistence with cloud sync
-function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
+interface AppData {
+  targetDate?: string;
+  excludedDates: ExcludedDate[];
+  tasks: Array<{
+    id: string;
+    text: string;
+    completed: boolean;
+    dueDate?: string;
+  }>;
+}
+
+// Hook for localStorage persistence
+function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
       if (!item) return initialValue;
-      
-      // Migration for excluded dates (from string[] to ExcludedDate[])
-      if (key === "daycount-excluded") {
-        const parsed = JSON.parse(item);
-        if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
-          return parsed.map((d: string) => ({ date: d })) as unknown as T;
-        }
-      }
       return JSON.parse(item);
     } catch (error) {
       console.error(error);
@@ -48,10 +45,11 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => voi
     }
   });
 
-  const setValue = (value: T) => {
+  const setValue = (value: T | ((val: T) => T)) => {
     try {
-      setStoredValue(value);
-      window.localStorage.setItem(key, JSON.stringify(value));
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
     } catch (error) {
       console.error(error);
     }
@@ -62,12 +60,11 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => voi
 
 export default function Home() {
   const { toast } = useToast();
-  
+
   // -- Persistent State --
   const [targetDate, setTargetDate] = useLocalStorage<Date | undefined>("daycount-target", undefined);
   const [excludedDates, setExcludedDates] = useLocalStorage<ExcludedDate[]>("daycount-excluded", []);
   const [tasks, setTasks] = useLocalStorage<Task[]>("daycount-tasks", []);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [hasLoadedRemote, setHasLoadedRemote] = useState(false);
   const [syncStatus, setSyncStatus] = useState<{
     state: "idle" | "loading" | "saving" | "saved" | "error";
@@ -75,18 +72,14 @@ export default function Home() {
     at?: string;
   }>({ state: "idle" });
 
-  const applyRemoteData = useCallback((data: { targetDate?: string; excludedDates: ExcludedDate[]; tasks: Task[] }) => {
-    const currentTargetDate = localStorage.getItem("daycount-target");
-    const currentExcluded = localStorage.getItem("daycount-excluded");
-    const currentTasks = localStorage.getItem("daycount-tasks");
-
-    if (!currentTargetDate && data.targetDate) {
+  const applyRemoteData = useCallback((data: AppData) => {
+    if (data.targetDate) {
       setTargetDate(new Date(data.targetDate));
     }
-    if ((!currentExcluded || currentExcluded === "[]") && data.excludedDates.length > 0) {
+    if (data.excludedDates) {
       setExcludedDates(data.excludedDates);
     }
-    if ((!currentTasks || currentTasks === "[]") && data.tasks.length > 0) {
+    if (data.tasks) {
       setTasks(data.tasks.map(t => ({
         ...t,
         dueDate: t.dueDate ? new Date(t.dueDate) : undefined
@@ -94,482 +87,182 @@ export default function Home() {
     }
   }, [setExcludedDates, setTargetDate, setTasks]);
 
-  // Load data from Firebase on mount
+  // Load from Firebase
   useEffect(() => {
-    const loadFromFirebaseAsync = async () => {
+    const init = async () => {
       try {
-        setIsSyncing(true);
         setSyncStatus({ state: "loading" });
         const data = await loadFromFirebase();
         if (data) {
-          // Only load if we don't have local data (to avoid overwriting)
           applyRemoteData(data);
           setSyncStatus({ state: "saved", at: new Date().toISOString() });
         } else {
-          setSyncStatus({ state: "idle", message: "No cloud data found yet." });
+          setSyncStatus({ state: "idle", message: "No cloud data found." });
         }
       } catch (error) {
-        console.error("Failed to load from Firebase:", error);
-        setSyncStatus({ state: "error", message: "Failed to load from cloud." });
+        console.error(error);
+        setSyncStatus({ state: "error", message: "Cloud fetch failed." });
       } finally {
         setHasLoadedRemote(true);
-        setIsSyncing(false);
       }
     };
-    
-    loadFromFirebaseAsync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+    init();
+  }, [applyRemoteData]);
 
-  // Sync to Firebase when data changes (debounced)
+  // Sync to Firebase
   useEffect(() => {
     if (!hasLoadedRemote) return;
     const timeoutId = setTimeout(async () => {
       try {
-        setIsSyncing(true);
         setSyncStatus({ state: "saving" });
         await saveToFirebase({
-          targetDate: targetDate?.toISOString(),
+          targetDate: targetDate instanceof Date ? targetDate.toISOString() : undefined,
           excludedDates,
           tasks: tasks.map(t => ({
             ...t,
-            dueDate: t.dueDate?.toISOString()
+            dueDate: t.dueDate instanceof Date ? t.dueDate.toISOString() : undefined
           }))
         });
         setSyncStatus({ state: "saved", at: new Date().toISOString() });
       } catch (error) {
-        console.error("Failed to save to Firebase:", error);
-        setSyncStatus({ state: "error", message: "Failed to save to cloud." });
-      } finally {
-        setIsSyncing(false);
+        console.error(error);
+        setSyncStatus({ state: "error", message: "Cloud sync failed." });
       }
-    }, 1000); // Debounce by 1 second
-
+    }, 2000);
     return () => clearTimeout(timeoutId);
   }, [targetDate, excludedDates, tasks, hasLoadedRemote]);
 
-  // -- UI State --
-  const [isExclusionsOpen, setIsExclusionsOpen] = useState(false);
-  const [isTasksOpen, setIsTasksOpen] = useState(false);
-  const [newTaskText, setNewTaskText] = useState("");
-  const [newTaskDate, setNewTaskDate] = useState<Date | undefined>(undefined);
-  
-  // The day ends at 5 PM local time - after 5 PM, the day is considered "over"
-  const END_OF_DAY_HOUR = 17; // 5 PM
-  
-  // Get the effective "today" - after 5 PM, the current day is over so we use tomorrow
+  // -- 5 PM Logic --
+  const END_OF_DAY_HOUR = 17;
   const getEffectiveToday = useCallback(() => {
     const now = new Date();
-    const currentHour = now.getHours();
-    
-    if (currentHour >= END_OF_DAY_HOUR) {
-      // After 5 PM - day is over, use tomorrow
+    if (now.getHours() >= END_OF_DAY_HOUR) {
       return addDays(startOfToday(), 1);
     }
     return startOfToday();
   }, []);
-  
-  // State to trigger re-renders when the day changes at 5 PM
-  const [effectiveToday, setEffectiveToday] = useState<Date>(getEffectiveToday);
-  
-  // Set up a timer to update the effective day at 5 PM
+
+  const [today, setToday] = useState<Date>(getEffectiveToday);
+
   useEffect(() => {
-    const checkAndUpdate = () => {
-      const newEffectiveToday = getEffectiveToday();
-      if (newEffectiveToday.getTime() !== effectiveToday.getTime()) {
-        setEffectiveToday(newEffectiveToday);
-        toast({
-          title: "Day complete!",
-          description: "The workday has ended. Countdown updated.",
-        });
+    const interval = setInterval(() => {
+      const next = getEffectiveToday();
+      if (next.getTime() !== today.getTime()) {
+        setToday(next);
+        toast({ title: "Workday Over!", description: "Countdown has shifted to tomorrow." });
       }
-    };
-    
-    // Calculate time until next 5 PM
-    const now = new Date();
-    const currentHour = now.getHours();
-    let next5PM: Date;
-    
-    if (currentHour >= END_OF_DAY_HOUR) {
-      // Already past 5 PM today, next trigger is tomorrow at 5 PM
-      next5PM = setMilliseconds(setSeconds(setMinutes(setHours(addDays(startOfToday(), 1), END_OF_DAY_HOUR), 0), 0), 0);
-    } else {
-      // Before 5 PM, next trigger is today at 5 PM
-      next5PM = setMilliseconds(setSeconds(setMinutes(setHours(startOfToday(), END_OF_DAY_HOUR), 0), 0), 0);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [today, getEffectiveToday, toast]);
+
+  // -- Computed --
+  const calendarDaysRemaining = useMemo(() => {
+    if (!targetDate) return 0;
+    return Math.max(0, differenceInCalendarDays(new Date(targetDate), today) + 1);
+  }, [targetDate, today]);
+
+  const workingDaysRemaining = useMemo(() => {
+    if (!targetDate) return 0;
+    let count = 0;
+    const diff = differenceInCalendarDays(new Date(targetDate), today);
+    const excludedSet = new Set(excludedDates.map(d => d.date));
+    for (let i = 0; i <= diff; i++) {
+      const d = addDays(today, i);
+      if (!isSaturday(d) && !isSunday(d) && !excludedSet.has(d.toISOString())) {
+        count++;
+      }
     }
-    
-    const msUntil5PM = next5PM.getTime() - now.getTime();
-    
-    // Set timeout for the next 5 PM transition
-    const timeoutId = setTimeout(() => {
-      checkAndUpdate();
-    }, msUntil5PM);
-    
-    // Also check every minute in case the user leaves the tab open
-    const intervalId = setInterval(checkAndUpdate, 60000);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      clearInterval(intervalId);
-    };
-  }, [effectiveToday, getEffectiveToday, toast]);
+    return count;
+  }, [targetDate, today, excludedDates]);
 
-  // -- Computed Values --
-  const today = effectiveToday; // Use effective today (accounts for 5 PM cutoff)
-  const safeTargetDate = targetDate ? new Date(targetDate) : undefined;
-  
-  // Calendar days remaining (inclusive of both today and target day)
-  const calendarDaysRemaining = safeTargetDate 
-    ? differenceInCalendarDays(safeTargetDate, today) + 1
-    : 0;
-
-  const calculateWorkingDays = () => {
-    if (!safeTargetDate || calendarDaysRemaining < 0) return 0;
-    let workingDays = 0;
-    const daysDiff = differenceInCalendarDays(safeTargetDate, today);
-    const excludedISOStrings = excludedDates.map(d => d.date);
-    for (let i = 0; i <= daysDiff; i++) {
-      const dayToCheck = addDays(today, i);
-      const isWeekend = isSaturday(dayToCheck) || isSunday(dayToCheck);
-      const isExcluded = excludedISOStrings.includes(dayToCheck.toISOString());
-      if (!isWeekend && !isExcluded) workingDays++;
-    }
-    return workingDays;
-  };
-
-  const workingDaysRemaining = calculateWorkingDays();
+  const taskDates = useMemo(() =>
+    tasks.filter(t => t.dueDate && !t.completed).map(t => new Date(t.dueDate!)),
+    [tasks]);
 
   // -- Handlers --
-  const toggleExclusion = (date: Date) => {
-    const isoDate = date.toISOString();
-    if (excludedDates.some(d => d.date === isoDate)) {
-      setExcludedDates(excludedDates.filter(d => d.date !== isoDate));
-    } else {
-      setExcludedDates([...excludedDates, { date: isoDate }]);
-    }
+  const handleToggleExclusion = (date: Date) => {
+    const iso = date.toISOString();
+    setExcludedDates((prev: ExcludedDate[]) =>
+      prev.some((d: ExcludedDate) => d.date === iso) ? prev.filter((d: ExcludedDate) => d.date !== iso) : [...prev, { date: iso }]
+    );
   };
 
-  const updateExclusionComment = (isoDate: string, comment: string) => {
-    setExcludedDates(excludedDates.map(d => d.date === isoDate ? { ...d, comment } : d));
+  const handleUpdateComment = (iso: string, comment: string) => {
+    setExcludedDates((prev: ExcludedDate[]) => prev.map((d: ExcludedDate) => d.date === iso ? { ...d, comment } : d));
   };
 
-  const resetAll = () => {
-    if (confirm("Are you sure you want to reset all data, including the target date, holidays, and tasks?")) {
+  const handleReset = () => {
+    if (confirm("Reset everything?")) {
       setTargetDate(undefined);
       setExcludedDates([]);
       setTasks([]);
-      toast({ title: "Reset complete", description: "All settings and tasks have been cleared." });
+      toast({ title: "Wiped clean", description: "Storage has been cleared." });
     }
   };
 
-  const addTask = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTaskText.trim()) return;
-    setTasks([...tasks, { 
-      id: crypto.randomUUID(), 
-      text: newTaskText, 
-      completed: false,
-      dueDate: newTaskDate
-    }]);
-    setNewTaskText("");
-    setNewTaskDate(undefined);
+  const handleAddTask = (text: string, dueDate?: Date) => {
+    setTasks((prev: Task[]) => [...prev, { id: crypto.randomUUID(), text, completed: false, dueDate }]);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  const handleToggleTask = (id: string) => {
+    setTasks((prev: Task[]) => prev.map((t: Task) => t.id === id ? { ...t, completed: !t.completed } : t));
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(t => t.id !== id));
+  const handleDeleteTask = (id: string) => {
+    setTasks((prev: Task[]) => prev.filter((t: Task) => t.id !== id));
   };
-
-  const excludedDatesObj = excludedDates.map(d => new Date(d.date));
-  const taskDates = tasks
-    .filter(t => t.dueDate && !t.completed)
-    .map(t => new Date(t.dueDate!));
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 font-sans text-foreground">
-      <div className="max-w-2xl mx-auto space-y-8">
-        {/* Header */}
-        <header className="relative flex items-center justify-center pb-6 border-b border-border">
-          <h1 className="text-4xl font-extrabold tracking-tighter text-primary">Countdown!</h1>
-          
-          {/* Settings dropdown - positioned on the right */}
-          <div className="absolute right-0 top-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                {/* Target Date */}
-                <div className="p-2">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Target Date</p>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !targetDate && "text-muted-foreground"
-                      )}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {targetDate ? format(new Date(targetDate), "PPP") : <span>Pick a target date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                      <Calendar
-                        mode="single"
-                        selected={safeTargetDate}
-                        onSelect={(date) => setTargetDate(date)}
-                        disabled={(date) => date < today}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                <DropdownMenuSeparator />
-                
-                {/* Sync Status */}
-                <div className="p-2 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Sync Status</p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        syncStatus.state === "error" && "bg-destructive",
-                        syncStatus.state === "saving" && "bg-primary animate-pulse",
-                        syncStatus.state === "loading" && "bg-primary animate-pulse",
-                        syncStatus.state === "saved" && "bg-emerald-500",
-                        syncStatus.state === "idle" && "bg-muted-foreground"
-                      )}
-                    />
-                    <span>
-                      {syncStatus.state === "loading" && "Loading from cloud..."}
-                      {syncStatus.state === "saving" && "Saving to cloud..."}
-                      {syncStatus.state === "saved" && "Synced"}
-                      {syncStatus.state === "error" && "Sync error"}
-                      {syncStatus.state === "idle" && "Idle"}
-                    </span>
-                  </div>
-                  {syncStatus.message && (
-                    <p className="text-xs text-muted-foreground">{syncStatus.message}</p>
-                  )}
-                  {syncStatus.at && (
-                    <p className="text-xs text-muted-foreground">
-                      Last sync: {format(new Date(syncStatus.at), "MMM d, h:mm a")}
-                    </p>
-                  )}
-                </div>
-                
-                {/* Reset */}
-                {targetDate && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={resetAll} className="text-destructive focus:text-destructive">
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset All Data
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-primary/30">
+      <div className="max-w-4xl mx-auto px-6 py-12 space-y-12">
+        <AppHeader
+          today={today}
+          targetDate={targetDate ? new Date(targetDate) : undefined}
+          onTargetDateSelect={setTargetDate}
+          syncStatus={syncStatus}
+          onReset={handleReset}
+        />
 
-        {/* Simplified Single Column Layout */}
-        <div className="flex flex-col gap-8">
-          {/* Top Section: Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <Card className="bg-card shadow-sm border-border/60">
-              <CardHeader className="pb-2 text-center">
-                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calendar Days</CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pb-6">
-                <div className="text-5xl font-bold tracking-tighter">
-                  {safeTargetDate ? Math.max(0, calendarDaysRemaining) : "—"}
-                </div>
-              </CardContent>
-            </Card>
+        <main className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-7 space-y-10">
+            <CountdownStats
+              hasTargetDate={!!targetDate}
+              calendarDays={calendarDaysRemaining}
+              workingDays={workingDaysRemaining}
+            />
 
-            <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-sm">
-              <CardHeader className="pb-2 text-center">
-                <CardTitle className="text-sm font-medium text-primary uppercase tracking-wider flex items-center justify-center gap-2">
-                  <Briefcase className="h-4 w-4" /> Working Days
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-center pb-6">
-                <div className="text-5xl font-bold text-primary tracking-tighter">
-                  {safeTargetDate ? Math.max(0, workingDaysRemaining) : "—"}
-                </div>
-              </CardContent>
-            </Card>
+            <ExclusionCalendar
+              today={today}
+              targetDate={targetDate ? new Date(targetDate) : undefined}
+              excludedDates={excludedDates}
+              taskDates={taskDates}
+              onToggleExclusion={handleToggleExclusion}
+              onUpdateComment={handleUpdateComment}
+            />
           </div>
 
-          {/* Calendar Section */}
-          <Card className="shadow-sm border-border/60 overflow-hidden">
-            <CardHeader className="text-center">
-              <CardTitle className="text-lg">Calendar</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-8">
-              <div className="flex justify-center w-full overflow-hidden">
-                <div className="w-full max-w-sm border rounded-lg p-2 bg-card">
-                  <div className="[&_.rdp]:!m-0 [&_.rdp-months]:!justify-center [&_.rdp-month]:!w-full [&_.rdp-table]:!w-full [&_.rdp-cell]:!p-0 [&_.rdp-button]:!h-10 [&_.rdp-button]:!w-full [&_.rdp-head_cell]:!font-bold [&_.rdp-day]:!h-10 [&_.rdp-day]:!w-full [&_.rdp-tbody]:!h-auto [&_.rdp-table]:!table-fixed [&_.rdp-table]:!border-collapse [&_.rdp-month]:!space-y-0">
-                    <Calendar
-                      mode="multiple"
-                      selected={excludedDatesObj}
-                      onSelect={(_, date) => toggleExclusion(date)}
-                      className="w-full h-auto"
-                      disabled={(date) => date < today}
-                      modifiers={{
-                        weekend: (date) => isSaturday(date) || isSunday(date),
-                        tasked: taskDates,
-                        expired: (date) => date < today,
-                        targetDay: safeTargetDate ? [safeTargetDate] : []
-                      }}
-                      modifiersClassNames={{
-                        expired: "calendar-day-expired",
-                        targetDay: "calendar-day-target"
-                      }}
-                      modifiersStyles={{
-                        weekend: { color: "var(--muted-foreground)", opacity: 0.5 },
-                        tasked: { 
-                          borderBottom: "2px solid var(--primary)",
-                          borderRadius: "0px"
-                        }
-                      }}
-                      showOutsideDays={false}
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <aside className="lg:col-span-5 bg-card/20 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl h-fit">
+            <TaskList
+              today={today}
+              tasks={tasks}
+              onAddTask={handleAddTask}
+              onToggleTask={handleToggleTask}
+              onDeleteTask={handleDeleteTask}
+            />
+          </aside>
+        </main>
 
-          {/* Management Stack */}
-          <div className="space-y-6">
-            {/* Exclusions Section */}
-            {excludedDates.length > 0 && (
-              <Collapsible open={isExclusionsOpen} onOpenChange={setIsExclusionsOpen} className="w-full">
-                <Card className="shadow-sm border-border/60">
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-center relative">
-                        <CardTitle className="text-lg">Excluded Dates</CardTitle>
-                        <div className="absolute right-0">
-                          {isExclusionsOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent className="pb-6">
-                      <div className="flex flex-col gap-4">
-                        {[...excludedDates].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((item) => (
-                          <div key={item.date} className="space-y-2 bg-secondary/30 p-4 rounded-xl border border-border/50">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-base">{format(new Date(item.date), "MMM d, yyyy")}</span>
-                              <button onClick={() => toggleExclusion(new Date(item.date))} className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10">
-                                <Trash2 className="h-5 w-5" />
-                              </button>
-                            </div>
-                            <Input 
-                              placeholder="Add a comment (e.g. Bank Holiday, Vacation)" 
-                              value={item.comment || ""} 
-                              onChange={(e) => updateExclusionComment(item.date, e.target.value)}
-                              className="bg-background/50 h-8 text-sm"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
-            )}
-
-            {/* Tasks Section */}
-            <Collapsible open={isTasksOpen} onOpenChange={setIsTasksOpen} className="w-full">
-              <Card className="shadow-sm border-border/60 flex flex-col">
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="pb-4 border-b border-border/40 bg-muted/20 text-center cursor-pointer hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center justify-center relative">
-                      <CardTitle className="flex items-center justify-center gap-2 text-lg">
-                        <CheckCircle2 className="h-5 w-5 text-primary" /> 
-                        Tasks
-                      </CardTitle>
-                      <div className="absolute right-0">
-                        {isTasksOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-                      </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="flex-1 p-0 flex flex-col">
-                    <ScrollArea className="flex-1 p-4 h-[400px]">
-                      {tasks.length === 0 ? (
-                        <div className="h-40 flex flex-col items-center justify-center text-muted-foreground/50 text-center px-4">
-                          <CheckCircle2 className="h-10 w-10 mb-2 opacity-20" />
-                          <p className="text-sm">No tasks yet. Add one below!</p>
-                        </div>
-                      ) : (
-                        <ul className="space-y-3">
-                          {tasks.sort((a, b) => {
-                            if (!a.dueDate && !b.dueDate) return 0;
-                            if (!a.dueDate) return 1;
-                            if (!b.dueDate) return -1;
-                            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-                          }).map(task => (
-                            <li key={task.id} className="group flex items-start gap-3 bg-card p-3 rounded-lg border border-transparent hover:border-border/50 transition-all">
-                              <Checkbox checked={task.completed} onCheckedChange={() => toggleTask(task.id)} className="mt-1" />
-                              <div className="flex-1 min-w-0">
-                                <p className={cn("text-sm leading-tight break-words transition-all", task.completed && "text-muted-foreground line-through decoration-muted-foreground/50")}>
-                                  {task.text}
-                                </p>
-                                {task.dueDate && (
-                                  <p className="text-[10px] mt-1 font-medium text-primary flex items-center gap-1">
-                                    <CalendarIcon className="h-2.5 w-2.5" />
-                                    Due: {format(new Date(task.dueDate), "MMM d")} ({differenceInCalendarDays(new Date(task.dueDate), today)} days left)
-                                  </p>
-                                )}
-                              </div>
-                              <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </ScrollArea>
-                    <div className="p-4 border-t border-border bg-background/50 backdrop-blur-sm space-y-3">
-                      <div className="flex gap-2">
-                        <Input placeholder="Add a new task..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} className="flex-1" />
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="icon" className={cn(!newTaskDate && "text-muted-foreground")}>
-                              <CalendarIcon className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar mode="single" selected={newTaskDate} onSelect={setNewTaskDate} disabled={(date) => date < today} initialFocus />
-                          </PopoverContent>
-                        </Popover>
-                        <Button type="submit" size="icon" disabled={!newTaskText.trim()} onClick={addTask}><Plus className="h-4 w-4" /></Button>
-                      </div>
-                      {newTaskDate && (
-                        <p className="text-[10px] font-medium text-primary flex items-center gap-1 animate-in slide-in-from-top-1">
-                          <CalendarIcon className="h-2.5 w-2.5" />
-                          Due date set for {format(newTaskDate, "MMM d")}
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
+        <footer className="pt-12 border-t border-white/5 flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              Daily reset at {END_OF_DAY_HOUR}:00 PM
+            </p>
           </div>
-        </div>
+          <p className="text-[10px] text-muted-foreground/40 font-medium">
+            Standardized on Firebase Cloud Storage
+          </p>
+        </footer>
       </div>
     </div>
   );
