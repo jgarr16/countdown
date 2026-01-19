@@ -40,7 +40,6 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
       if (!item) return initialValue;
       return JSON.parse(item);
     } catch (error) {
-      console.error(error);
       return initialValue;
     }
   });
@@ -53,7 +52,6 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
         return valueToStore;
       });
     } catch (error) {
-      console.error(error);
     }
   }, [key]);
 
@@ -61,7 +59,6 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
 }
 
 export default function Home() {
-  console.log("Home component initializing...");
   const { toast } = useToast();
 
   // -- Persistent State --
@@ -92,7 +89,6 @@ export default function Home() {
 
   // Load from Firebase
   useEffect(() => {
-    console.log("Home init effect running...");
     const init = async () => {
       try {
         setSyncStatus({ state: "loading" });
@@ -104,7 +100,6 @@ export default function Home() {
           setSyncStatus({ state: "idle", message: "No cloud data found." });
         }
       } catch (error) {
-        console.error(error);
         setSyncStatus({ state: "error", message: "Cloud fetch failed." });
       } finally {
         setHasLoadedRemote(true);
@@ -129,7 +124,6 @@ export default function Home() {
         });
         setSyncStatus({ state: "saved", at: new Date().toISOString() });
       } catch (error) {
-        console.error(error);
         setSyncStatus({ state: "error", message: "Cloud sync failed." });
       }
     }, 2000);
@@ -216,7 +210,6 @@ export default function Home() {
     setTasks((prev: Task[]) => prev.filter((t: Task) => t.id !== id));
   };
 
-  console.log("Home component rendering JSX...");
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-primary/30">
       <div className="max-w-4xl mx-auto px-6 py-12 space-y-12">
