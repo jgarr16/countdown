@@ -221,33 +221,29 @@ export default function Home() {
           onReset={handleReset}
         />
 
-        <main className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <div className="lg:col-span-7 space-y-10">
-            <CountdownStats
-              hasTargetDate={!!targetDate}
-              calendarDays={calendarDaysRemaining}
-              workingDays={workingDaysRemaining}
-            />
+        <main className="space-y-10 max-w-xl mx-auto">
+          <CountdownStats
+            hasTargetDate={!!targetDate}
+            calendarDays={calendarDaysRemaining}
+            workingDays={workingDaysRemaining}
+          />
 
-            <ExclusionCalendar
-              today={today}
-              targetDate={targetDate ? new Date(targetDate) : undefined}
-              excludedDates={excludedDates}
-              taskDates={taskDates}
-              onToggleExclusion={handleToggleExclusion}
-              onUpdateComment={handleUpdateComment}
-            />
-          </div>
+          <ExclusionCalendar
+            today={today}
+            targetDate={targetDate ? new Date(targetDate) : undefined}
+            excludedDates={excludedDates}
+            taskDates={taskDates}
+            onToggleExclusion={handleToggleExclusion}
+            onUpdateComment={handleUpdateComment}
+          />
 
-          <aside className="lg:col-span-5 bg-card/20 backdrop-blur-xl border border-white/5 rounded-3xl p-6 shadow-2xl h-fit">
-            <TaskList
-              today={today}
-              tasks={tasks}
-              onAddTask={handleAddTask}
-              onToggleTask={handleToggleTask}
-              onDeleteTask={handleDeleteTask}
-            />
-          </aside>
+          <TaskList
+            today={today}
+            tasks={tasks}
+            onAddTask={handleAddTask}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+          />
         </main>
 
         <footer className="pt-12 border-t border-white/5 flex flex-col items-center gap-2">
