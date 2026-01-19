@@ -219,11 +219,3 @@
 .rdp-day_selected {
   color: hsl(var(--primary-foreground)) !important;
 }
-
-/* Force weekend visibility */
-.rdp-table tbody tr td:first-child .rdp-day,
-.rdp-table tbody tr td:last-child .rdp-day {
-  color: white !important;
-  font-weight: bold !important;
-  opacity: 1 !important;
-}
